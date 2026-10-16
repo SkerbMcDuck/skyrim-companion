@@ -177,7 +177,7 @@ namespace companion::extras
 						if (!xList) {
 							continue;
 						}
-						const int n = std::max(1, static_cast<int>(xList->GetCount()));
+						const int n = (std::max)(1, static_cast<int>(xList->GetCount()));
 						bySoul[static_cast<int>(xList->GetSoulLevel())] += n;
 						counted += n;
 					}
