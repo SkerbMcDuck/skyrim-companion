@@ -22,7 +22,16 @@ jobs:
         run: xmake config --yes --mode=releasedbg
 
       - name: Compile
-        run: xmake build --yes --verbose SkyrimCompanion
+        shell: pwsh
+        run: |
+          xmake build --yes --verbose SkyrimCompanion 2>&1 | Tee-Object -FilePath build-log.txt
+          $code = $LASTEXITCODE
+          # Surface compiler errors as annotations (the raw log isn't always reachable).
+          Select-String -Path build-log.txt -Pattern ': (fatal )?error ' | Select-Object -First 40 | ForEach-Object {
+            $msg = $_.Line -replace '%', '%25'
+            Write-Output "::error::$msg"
+          }
+          exit $code
 
       - name: Package for Vortex
         shell: pwsh
