@@ -28,11 +28,21 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.35 var(--font); overflow: hidden; }
-  .app { display: grid; grid-template-columns: 340px 1fr 380px; height: 100vh; }
-  .col { display: flex; flex-direction: column; gap: 8px; padding: 8px; overflow-y: auto; min-height: 0; background: var(--panel-solid); }
+  .app { display: grid; grid-template-columns: 360px 1fr 380px; height: 100vh; }
+  .col { display: flex; flex-direction: column; gap: 6px; padding: 6px; overflow: hidden; min-height: 0; background: var(--panel-solid); }
   .col::-webkit-scrollbar { width: 6px; } .col::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
   .center { position: relative; min-width: 0; overflow: hidden; background: #000; }
-  .panel { background: var(--panel); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); padding: 8px 10px 10px; }
+  .panel { background: var(--panel); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); padding: 6px 10px 8px;
+    display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
+  .panel.grow { flex: 1 1 0; }
+  .panel.grow2 { flex: 2 1 0; }
+  .panel.grow3 { flex: 3 1 0; }
+  .panel .list { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .more { font-size: 12px; color: var(--dim); padding: 3px 2px 0; letter-spacing: .04em; }
+  .sumchips { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); margin: -2px 0 4px; }
+  .sumchips b { color: var(--ink); font-weight: 400; }
+  .sumchips b.low { color: var(--bad); }
+  .keys { position: absolute; bottom: 44px; left: 10px; font-size: 11px; color: var(--muted); background: rgba(0,0,0,.55); padding: 3px 8px; letter-spacing: .03em; }
   .panel h2 { margin: 0 0 8px; font: 400 13px/1 var(--font); letter-spacing: .18em; text-transform: uppercase; color: var(--gold);
     display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
   .panel h2 small { font-size: 11px; letter-spacing: .06em; text-transform: none; color: var(--muted); }
@@ -72,11 +82,11 @@
 
   /* mini map */
   .mini-wrap { position: relative; }
-  #miniMap { display: block; width: 100%; aspect-ratio: 1; }
+  #miniMap { display: block; width: min(100%, 30vh); aspect-ratio: 1; margin: 0 auto; }
   .mini-info { position: absolute; bottom: 2px; right: 4px; font-size: 11px; color: var(--muted); }
 
   /* bars */
-  .bar { margin: 5px 0 7px; }
+  .bar { margin: 3px 0 5px; }
   .bar-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); letter-spacing: .04em; }
   .bar-top b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
   .track { position: relative; height: 9px; background: rgba(255,255,255,.07); border: 1px solid var(--line); }
@@ -92,16 +102,16 @@
 
   /* stats grid */
   .bigstat { display: flex; align-items: baseline; justify-content: space-between; }
-  .bigstat .n { font-size: 28px; letter-spacing: .02em; }
+  .bigstat .n { font-size: 22px; letter-spacing: .02em; }
   .res { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; font-size: 12px; margin-top: 6px; }
   .res span { display: flex; justify-content: space-between; color: var(--muted); }
   .res b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
 
   /* lists (SkyUI style) */
   .list { display: flex; flex-direction: column; }
-  .row { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 5px 2px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .row { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 3px 2px; border-bottom: 1px solid rgba(255,255,255,.07); }
   .row:last-child { border-bottom: 0; }
-  .ico { position: relative; width: 30px; height: 30px; }
+  .ico { position: relative; width: 26px; height: 26px; }
   .ico img { width: 100%; height: 100%; object-fit: contain; }
   .ico .emb { position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; }
   .ico.fallback { border: 1px solid var(--line); border-radius: 50%; }
@@ -113,7 +123,7 @@
   .tbar { height: 3px; background: rgba(255,255,255,.1); margin-top: 3px; }
   .tbar i { display: block; height: 100%; background: var(--ink); }
   .row.bad .tbar i { background: var(--bad); }
-  .row .desc { grid-column: 2 / 4; font-size: 12px; color: var(--muted); margin-top: -2px; white-space: normal; }
+  .row .desc { grid-column: 2 / 4; font-size: 12px; color: var(--muted); margin-top: -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .group-h { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 8px 0 2px; }
   .group-h:first-child { margin-top: 0; }
   .count { font-size: 15px; }
@@ -126,6 +136,7 @@
     .app { grid-template-columns: 1fr; height: auto; }
     .center { height: 65vh; order: -1; }
     .col { overflow: visible; }
+    .panel .list { overflow: visible; }
   }
 </style>
 </head>
@@ -133,12 +144,13 @@
 <div class="app">
   <!-- LEFT: effects + consumables -->
   <aside class="col" id="colLeft">
-    <section class="panel">
+    <section class="panel grow3">
       <h2>Active Effects <label class="toggle"><input type="checkbox" id="setHidden"> hidden</label></h2>
       <div class="list" id="effects"><div class="empty">No active effects</div></div>
     </section>
-    <section class="panel">
+    <section class="panel grow2">
       <h2>Consumables <small id="consTotal"></small></h2>
+      <div class="sumchips" id="consSummary"></div>
       <div class="list" id="consumables"><div class="empty">Nothing to show yet</div></div>
     </section>
   </aside>
@@ -161,6 +173,7 @@
       <button id="btnSpoil">Undiscovered: off</button>
       <button id="btnTrailClear">Clear trail</button>
     </div>
+    <div class="keys" id="keysHint">In game: NumPad + / − zoom · NumPad * map view · NumPad . undiscovered · NumPad / abilities</div>
     <div class="status"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
     <div class="tooltip" id="tooltip"></div>
   </main>
@@ -190,11 +203,11 @@
       <div id="survival"><div class="empty">Survival Mode not detected</div></div>
     </section>
 
-    <section class="panel">
+    <section class="panel grow">
       <h2>Equipment <small id="gold"></small></h2>
       <div class="bigstat"><span class="muted">Armor rating</span><span class="n" id="armorRating">—</span></div>
       <div class="res" id="resists"></div>
-      <div class="bar" style="margin-top:10px"><div class="bar-top"><span>Carry weight</span><b id="carryText">—</b></div><div class="track"><div class="fill" id="carryFill" style="background:var(--gold)"></div></div></div>
+      <div class="bar" style="margin-top:6px"><div class="bar-top"><span>Carry weight</span><b id="carryText">—</b></div><div class="track"><div class="fill" id="carryFill" style="background:var(--gold)"></div></div></div>
       <div class="list" id="equipment"><div class="empty">Nothing equipped</div></div>
     </section>
   </aside>
@@ -363,6 +376,23 @@
     return "default_potion";
   }
 
+  // Shows as many rows as fit in the panel and replaces the rest with "+N more", so nothing needs scrolling.
+  function fitList(el, noun) {
+    if (!el || window.innerWidth <= 1200) return;
+    const rows = () => [...el.children].filter(c => !c.classList.contains("more"));
+    let hidden = 0, guard = 200;
+    while (el.scrollHeight > el.clientHeight + 1 && guard-- > 0) {
+      const r = rows(); const last = r[r.length - 1];
+      if (!last || r.length <= 1) break;
+      last.remove(); if (!last.classList.contains("group-h")) hidden++;
+      let m = el.querySelector(".more");
+      if (!m) { m = document.createElement("div"); m.className = "more"; el.appendChild(m); }
+      m.textContent = `+${hidden} more ${noun}`;
+    }
+    // Don't end on a lonely group header.
+    const r = rows(); if (r.length && r[r.length - 1].classList.contains("group-h")) r[r.length - 1].remove();
+  }
+
   // ---------- state ----------
   const app = {
     demo: false, state: null, shown: null, markers: [], worldspace: 0, mapInfo: null, mapImg: null,
@@ -399,7 +429,29 @@
     if (!app.demo) { try { loadMarkerConfigs(await fetchJson("/api/mapmarker-configs")); } catch {} }
   }
 
+  // Hotkeys pressed in game arrive as numbered commands, so the page never needs the mouse.
+  let lastCmd = null;
+  const VIEWS = [{ follow: true, scale: 0.012 }, { follow: true, scale: 0.004 }, { follow: false, whole: true }];
+  let viewIdx = 0;
+  function runCommands(cmds) {
+    if (!cmds || !cmds.length) return;
+    const maxId = Math.max(...cmds.map(c => c.id));
+    if (lastCmd === null) { lastCmd = maxId; return; } // don't replay presses from before the page opened
+    for (const c of cmds.filter(c => c.id > lastCmd).sort((a, b) => a.id - b.id)) {
+      if (c.cmd === "zoomIn") app.view.scale = clamp(app.view.scale * 1.5, 0.0006, 0.08);
+      else if (c.cmd === "zoomOut") app.view.scale = clamp(app.view.scale / 1.5, 0.0006, 0.08);
+      else if (c.cmd === "cycleView") {
+        viewIdx = (viewIdx + 1) % VIEWS.length; const v = VIEWS[viewIdx];
+        app.follow = v.follow; $("btnFollow").classList.toggle("active", v.follow);
+        if (v.whole) fitWorld(); else app.view.scale = v.scale;
+      } else if (c.cmd === "toggleUndiscovered") { app.settings.spoilers = !app.settings.spoilers; store.set("settings", app.settings); syncSpoil(); }
+      else if (c.cmd === "toggleAbilities") { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); }
+    }
+    lastCmd = Math.max(lastCmd, maxId);
+  }
+
   function onState(s) {
+    runCommands(s.commands);
     if (!s.ready) { app.state = null; setConn("wait", "Waiting for a loaded save…"); return; }
     $("banner").style.display = "none";
     setConn("ok", app.demo ? "Demo mode" : "Live");
@@ -612,11 +664,10 @@
   function effectRow(e) {
     const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed, pct = timed ? clamp(left / e.dur, 0, 1) * 100 : 100;
     const desc = fillDesc(e);
-    return `<div class="row ${e.detrimental ? "bad" : ""} ${e.inactive ? "inactive" : ""}">
+    return `<div class="row ${e.detrimental ? "bad" : ""} ${e.inactive ? "inactive" : ""}" title="${esc(desc)}">
       ${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
       <div style="min-width:0"><div class="name">${esc(e.name)}</div><div class="sub">${esc(effectSource(e))}</div>${timed ? `<div class="tbar"><i style="width:${pct}%"></i></div>` : ""}</div>
       <div class="right">${timed ? fmtTime(left) : '<span class="dim">—</span>'}${e.mag ? `<div class="sub">${Math.round(e.mag)}</div>` : ""}</div>
-      ${desc ? `<div class="desc">${esc(desc)}</div>` : ""}
     </div>`;
   }
   function renderEffects(list) {
@@ -635,6 +686,7 @@
       if (abilitiesOpen) html += abil.map(effectRow).join("");
     }
     el.innerHTML = html;
+    fitList(el, "effects");
     const t = $("abilToggle");
     if (t) t.onclick = () => { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); renderEffects(list); };
   }
@@ -692,6 +744,7 @@
       rows.push(`<div class="row">${iconHtml("items/" + armorIcon(a.slot, a.weight) + ".png")}<div style="min-width:0"><div class="name">${esc(a.name)}</div><div class="sub">${esc(sub)}</div></div><div class="right">${a.armor ? Math.round(a.armor) : ""}</div></div>`);
     }
     $("equipment").innerHTML = rows.length ? rows.join("") : `<div class="empty">Nothing equipped</div>`;
+    fitList($("equipment"), "items");
   }
 
   function mainEffect(p) {
@@ -718,7 +771,7 @@
   const GROUP_ORDER = ["Restore Health", "Restore Magicka", "Restore Stamina", "Regeneration", "Cures", "Resistances", "Fortify", "Other potions", "Food & Drink", "Poisons"];
   function renderConsumables(list) {
     const el = $("consumables");
-    if (!list || !list.length) { el.innerHTML = `<div class="empty">No potions, food or poisons</div>`; $("consTotal").textContent = ""; return; }
+    if (!list || !list.length) { el.innerHTML = `<div class="empty">No potions, food or poisons</div>`; $("consTotal").textContent = ""; $("consSummary").innerHTML = ""; return; }
     const groups = new Map();
     for (const p of list) { const g = consGroup(p); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p); }
     let html = "", total = 0;
@@ -734,6 +787,11 @@
       }).join("");
     }
     el.innerHTML = html; $("consTotal").textContent = total + " total";
+    // Always-visible counts for the three potions that matter mid-fight.
+    const cnt = (g) => (groups.get(g) || []).reduce((a, b) => a + b.count, 0);
+    $("consSummary").innerHTML = [["Health", "Restore Health"], ["Magicka", "Restore Magicka"], ["Stamina", "Restore Stamina"]]
+      .map(([n, g]) => { const c = cnt(g); return `<span>${n} <b class="${c <= 2 ? "low" : ""}">${c}</b></span>`; }).join("");
+    fitList(el, "items");
   }
 
   let lastSlow = 0;
@@ -758,6 +816,7 @@
     // Inventory-based panels change slowly; don't rebuild them on every update.
     if (Date.now() - lastSlow > 900) { lastSlow = Date.now(); renderEquipment(s.equipment); renderConsumables(s.consumables); }
   }
+  window.addEventListener("resize", () => { lastSlow = 0; if (app.state) renderPanels(app.state); });
   $("setHidden").checked = !!app.settings.hidden;
   $("setHidden").onchange = () => { app.settings.hidden = $("setHidden").checked; store.set("settings", app.settings); if (app.state) renderEffects(app.state.effects); };
 

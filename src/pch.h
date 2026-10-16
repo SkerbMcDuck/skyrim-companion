@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <deque>
 #include <cmath>
 #include <filesystem>
 #include <fstream>

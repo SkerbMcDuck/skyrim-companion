@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "State.h"
+#include "Hotkeys.h"
 
 namespace
 {
@@ -75,7 +76,13 @@ namespace
 	companion::server::Response Handle(const std::string& a_path)
 	{
 		if (a_path == "/api/state") {
-			return { 200, "application/json", companion::state::GetStateJson() };
+			// Add recent in-game hotkey presses to the snapshot.
+			auto text = companion::state::GetStateJson();
+			const auto end = text.rfind('}');
+			if (end != std::string::npos) {
+				text.insert(end, ",\"commands\":" + companion::hotkeys::Recent().dump());
+			}
+			return { 200, "application/json", text };
 		}
 		if (a_path == "/api/markers") {
 			return { 200, "application/json", companion::state::GetMarkersJson() };
@@ -94,6 +101,7 @@ namespace
 		switch (a_msg->type) {
 		case SKSE::MessagingInterface::kDataLoaded:
 			companion::state::StartPolling();
+			companion::hotkeys::Install();
 			break;
 		case SKSE::MessagingInterface::kPreLoadGame:
 			companion::state::SetGameReady(false);
