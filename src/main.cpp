@@ -29,6 +29,7 @@ namespace
 		if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
 		if (ext == ".webp") return "image/webp";
 		if (ext == ".svg") return "image/svg+xml";
+		if (ext == ".ttf") return "font/ttf";
 		return "application/octet-stream";
 	}
 
@@ -52,6 +53,25 @@ namespace
 		return { 200, ContentTypeFor(file), ss.str() };
 	}
 
+	// Map Marker Framework / CoMAP config files from Data/MapMarkers, so the page can
+	// show the same custom icons as the in-game map. Sent as raw text (they contain comments).
+	std::string MapMarkerConfigs()
+	{
+		json out = json::object();
+		const auto dir = g_webRoot.parent_path().parent_path().parent_path() / "MapMarkers";
+		std::error_code ec;
+		for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
+			if (!entry.is_regular_file() || entry.path().extension() != ".json") {
+				continue;
+			}
+			std::ifstream in(entry.path(), std::ios::binary);
+			std::ostringstream ss;
+			ss << in.rdbuf();
+			out[entry.path().filename().string()] = ss.str();
+		}
+		return out.dump(-1, ' ', false, json::error_handler_t::replace);
+	}
+
 	companion::server::Response Handle(const std::string& a_path)
 	{
 		if (a_path == "/api/state") {
@@ -59,6 +79,9 @@ namespace
 		}
 		if (a_path == "/api/markers") {
 			return { 200, "application/json", companion::state::GetMarkersJson() };
+		}
+		if (a_path == "/api/mapmarker-configs") {
+			return { 200, "application/json", MapMarkerConfigs() };
 		}
 		if (a_path == "/api/ping") {
 			return { 200, "application/json", R"({"ok":true,"app":"SkyrimCompanion"})" };

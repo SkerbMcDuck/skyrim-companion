@@ -12,3 +12,6 @@ vs*/
 # files
 *.zip
 compile_commands.json
+
+# personal assets extracted from a local game install (never commit)
+web/assets/

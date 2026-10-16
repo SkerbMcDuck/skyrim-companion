@@ -1,4 +1,5 @@
 #include "State.h"
+#include "Readouts.h"
 
 namespace companion::state
 {
@@ -17,6 +18,8 @@ namespace companion::state
 
 		// Only touched on the game thread.
 		RE::FormID g_lastWorldspace = 0xFFFFFFFF;
+		int        g_ticksSinceInventory = 1000;
+		json       g_slowParts = json::object();  // equipment + consumables, refreshed about once a second
 		int        g_ticksSinceMarkers = kMarkerRefreshTicks;
 
 		std::string SafeName(const char* a_name)
@@ -68,6 +71,7 @@ namespace companion::state
 			j["where"] = {
 				{ "worldspaceId", worldspace ? worldspace->GetFormID() : 0 },
 				{ "worldspace", worldspace ? SafeName(worldspace->GetName()) : "" },
+				{ "worldspaceEdid", worldspace ? SafeName(worldspace->GetFormEditorID()) : "" },
 				{ "cell", cell ? SafeName(cell->GetName()) : "" },
 				{ "interior", cell ? cell->IsInteriorCell() : false },
 				{ "location", location ? SafeName(location->GetName()) : "" }
@@ -140,6 +144,7 @@ namespace companion::state
 				const auto data = extra->mapData;
 				const auto refPos = ref->GetPosition();
 				list.push_back({
+					{ "ref", readouts::RefKey(ref) },
 					{ "name", SafeName(data->locationName.GetFullName()) },
 					{ "x", refPos.x },
 					{ "y", refPos.y },
@@ -160,7 +165,26 @@ namespace companion::state
 					std::scoped_lock l{ g_lock };
 					g_stateJson = R"({"ready":false})";
 				} else {
-					auto stateText = BuildState(player).dump();
+					auto state = BuildState(player);
+					auto safely = [](const char* a_what, auto&& a_fn) -> json {
+						try {
+							return a_fn();
+						} catch (const std::exception& e) {
+							logs::error("{} failed: {}", a_what, e.what());
+							return nullptr;
+						}
+					};
+					state["effects"] = safely("Active effects", [&] { return readouts::ActiveEffects(player); });
+					state["survival"] = safely("Survival", [] { return readouts::Survival(); });
+					if (++g_ticksSinceInventory >= 10) {
+						g_ticksSinceInventory = 0;
+						g_slowParts = {
+							{ "equipment", safely("Equipment", [&] { return readouts::Equipment(player); }) },
+							{ "consumables", safely("Consumables", [&] { return readouts::Consumables(player); }) }
+						};
+					}
+					state.update(g_slowParts);
+					auto stateText = state.dump(-1, ' ', false, json::error_handler_t::replace);
 
 					const auto worldspace = player->GetWorldspace();
 					const RE::FormID wsId = worldspace ? worldspace->GetFormID() : 0;
@@ -168,7 +192,7 @@ namespace companion::state
 					if (wsId != g_lastWorldspace || ++g_ticksSinceMarkers >= kMarkerRefreshTicks) {
 						// Indoors there is no worldspace; keep showing the last outdoor markers.
 						if (worldspace) {
-							markersText = BuildMarkers(worldspace).dump();
+							markersText = BuildMarkers(worldspace).dump(-1, ' ', false, json::error_handler_t::replace);
 						}
 						g_lastWorldspace = wsId;
 						g_ticksSinceMarkers = 0;
@@ -191,6 +215,7 @@ namespace companion::state
 	{
 		g_gameReady = a_ready;
 		g_rescanMarkers = true;  // a different save can have different markers
+		g_ticksSinceInventory = 1000;
 		if (!a_ready) {
 			std::scoped_lock l{ g_lock };
 			g_stateJson = R"({"ready":false})";

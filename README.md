@@ -4,13 +4,22 @@ A live map and character readout for Skyrim Special Edition that runs in a brows
 
 ## What it shows
 
-- **World map** with your position and facing, every map marker you've found, and a trail of where you've walked. Drag to pan, scroll to zoom, "Follow player" to lock on.
-- **Mini map** that rotates with you (can be turned off), with nearby places and your trail.
-- **Local map** that traces your path inside dungeons and buildings, or a 500 m view outdoors.
-- **Readouts**: health, magicka, stamina, level, gold, in-game time and date, heading, nearest known place, places discovered, and combat/sneak/mounted status.
-- **Optional map picture**: load any map image you own (a screenshot of your in-game map works) and line it up in two clicks.
+A second-monitor HUD, MMO style:
 
-Undiscovered places stay hidden unless you turn on "Show undiscovered places".
+- **World map**, always open: your position and facing, discovered map markers with their in-game icons, and a trail of where you've walked. Drag to pan, scroll to zoom, "Follow" to lock on.
+- **Mini map** that rotates with you. Outdoors it shows the map around you; indoors it traces your path.
+- **Compass**, location, and in-game time and date.
+- **Vitals**: health, magicka, stamina, plus combat, sneak, and mounted status.
+- **Active effects**: every effect on you with its icon, strength, time left, description, and source (potion, spell, enchanted item, or who cast it).
+- **Survival** (Survival Mode): live hunger, cold, and fatigue meters with stage names.
+- **Equipment**: both hands, ammo count, shout/power, every worn piece with armor values and enchantments, total armor rating, resistances, and carry weight.
+- **Consumables**: potions grouped by what they do (Restore Health, Magicka, Stamina, cures, resistances, and so on), food, and poisons, with counts.
+
+Undiscovered places stay hidden unless you turn on "Undiscovered".
+
+## Game visuals (assets pack)
+
+The map picture, icons, and font come from your own game install (your map mod, CoMAP, SkyUI, and your UI font). They are packaged separately as "Skyrim Companion - Assets" and are not part of this repository. Install that pack in Vortex alongside the plugin. Without it the window still works, with plain shapes instead of icons.
 
 ## Requirements
 
@@ -54,7 +63,7 @@ The plugin only reads game data. It writes nothing to your saves. Its web server
 ## Planned
 
 - Quest target markers
-- A true local map image for interiors
+- The game's real local map (captured from the engine) for the mini map
 - Custom markers and notes
 
 ## License

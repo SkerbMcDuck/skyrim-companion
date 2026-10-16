@@ -5,152 +5,197 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Skyrim Companion</title>
 <style>
+  @font-face { font-family: "Sovngarde"; src: url("assets/fonts/Sovngarde.ttf") format("truetype"); }
   :root {
-    --bg: #14120f;
-    --panel: #1d1a16;
-    --panel-2: #262119;
-    --line: #3a3226;
-    --ink: #e9e0cf;
-    --muted: #a39782;
-    --gold: #c9a45c;
-    --health: #b8463c;
-    --magicka: #3f6fb6;
-    --stamina: #4f9a56;
-    --map-bg: #2a251d;
-    --map-grid: rgba(233, 224, 207, 0.06);
+    --bg: #0b0a09;
+    --panel: rgba(12, 11, 10, 0.86);
+    --panel-solid: #141210;
+    --line: rgba(255, 255, 255, 0.16);
+    --line-strong: rgba(255, 255, 255, 0.32);
+    --ink: #f2efe8;
+    --muted: #a9a398;
+    --dim: #6f6a61;
+    --gold: #d8c08a;
+    --health: #b4291f;
+    --magicka: #2b63c4;
+    --stamina: #3f8f3a;
+    --bad: #d0574c;
+    --good: #8fc27e;
+    --hunger: #c9893b;
+    --cold: #6fb3d9;
+    --fatigue: #9a86c9;
+    --font: "Sovngarde", "Futura", "Century Gothic", "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
-    font: 14px/1.4 "Segoe UI", system-ui, sans-serif; overflow: hidden; }
-  .app { display: grid; grid-template-columns: 1fr 360px; height: 100vh; }
-  .main { position: relative; min-width: 0; border-right: 1px solid var(--line); }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.35 var(--font); overflow: hidden; }
+  .app { display: grid; grid-template-columns: 340px 1fr 380px; height: 100vh; }
+  .col { display: flex; flex-direction: column; gap: 8px; padding: 8px; overflow-y: auto; min-height: 0; background: var(--panel-solid); }
+  .col::-webkit-scrollbar { width: 6px; } .col::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+  .center { position: relative; min-width: 0; overflow: hidden; background: #000; }
+  .panel { background: var(--panel); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); padding: 8px 10px 10px; }
+  .panel h2 { margin: 0 0 8px; font: 400 13px/1 var(--font); letter-spacing: .18em; text-transform: uppercase; color: var(--gold);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .panel h2 small { font-size: 11px; letter-spacing: .06em; text-transform: none; color: var(--muted); }
+  .muted { color: var(--muted); } .dim { color: var(--dim); }
+  .empty { color: var(--dim); font-size: 13px; padding: 4px 0; }
+
+  /* world map */
   #worldMap { display: block; width: 100%; height: 100%; cursor: grab; }
   #worldMap.dragging { cursor: grabbing; }
-  #worldMap.picking { cursor: crosshair; }
-  .side { display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow-y: auto; background: var(--panel); }
-  .card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
-  .card h2 { margin: 0 0 8px; font: 600 11px/1 "Segoe UI", sans-serif; letter-spacing: .14em;
-    text-transform: uppercase; color: var(--gold); display: flex; justify-content: space-between; align-items: center; }
-  .card h2 small { color: var(--muted); letter-spacing: .04em; text-transform: none; font-weight: 400; }
-  #miniMap, #localMap { display: block; width: 100%; aspect-ratio: 1; border-radius: 6px; background: var(--map-bg); }
-  #localMap { aspect-ratio: 4 / 3; }
-  .bar { margin: 6px 0; }
-  .bar-top { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
-  .bar-top b { color: var(--ink); font-weight: 600; }
-  .track { height: 10px; background: #0f0d0b; border-radius: 5px; overflow: hidden; border: 1px solid var(--line); }
-  .fill { height: 100%; width: 0; transition: width .25s ease; }
-  .kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 13px; }
-  .kv dt { color: var(--muted); }
-  .kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
-  .chip.on { color: var(--bg); background: var(--gold); border-color: var(--gold); }
-  .chip.on.danger { background: var(--health); border-color: var(--health); color: #fff; }
-  .status { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center;
-    background: rgba(20, 18, 15, .85); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: 12px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #777; }
-  .dot.ok { background: var(--stamina); } .dot.wait { background: var(--gold); } .dot.bad { background: var(--health); }
-  .where { position: absolute; top: 12px; right: 12px; text-align: right; background: rgba(20, 18, 15, .85);
-    border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; max-width: 50%; }
-  .where .big { font-size: 16px; font-weight: 600; color: var(--ink); }
-  .where .small { font-size: 12px; color: var(--muted); }
-  .toolbar { position: absolute; bottom: 12px; left: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
-  button, select { font: inherit; font-size: 12px; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line);
-    border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  .hud-top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 10px 14px; background: linear-gradient(rgba(0,0,0,.75), rgba(0,0,0,0)); pointer-events: none; }
+  .loc-big { font-size: 22px; letter-spacing: .06em; text-shadow: 0 1px 3px #000; }
+  .loc-small { font-size: 13px; color: var(--muted); text-shadow: 0 1px 2px #000; }
+  .clock { text-align: right; }
+  .clock .t { font-size: 22px; letter-spacing: .04em; text-shadow: 0 1px 3px #000; }
+  .clock .d { font-size: 13px; color: var(--muted); }
+  .compass { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); width: 420px; max-width: 70%; height: 26px;
+    overflow: hidden; border-bottom: 1px solid var(--line-strong); background: rgba(0,0,0,.45); pointer-events: none; }
+  .compass .strip { position: absolute; top: 0; height: 100%; white-space: nowrap; font-size: 13px; }
+  .compass .tick { position: absolute; top: 5px; transform: translateX(-50%); color: var(--muted); }
+  .compass .tick.card { color: var(--ink); }
+  .compass .needle { position: absolute; left: 50%; top: 0; width: 2px; height: 100%; background: var(--gold); }
+  .toolbar { position: absolute; bottom: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .status { position: absolute; bottom: 12px; right: 12px; display: flex; gap: 8px; align-items: center; font-size: 12px;
+    background: rgba(0,0,0,.6); border: 1px solid var(--line); padding: 4px 10px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+  .dot.ok { background: var(--good); } .dot.wait { background: var(--gold); } .dot.bad { background: var(--bad); }
+  button { font: 13px var(--font); letter-spacing: .05em; color: var(--ink); background: rgba(0,0,0,.65); border: 1px solid var(--line-strong);
+    padding: 5px 10px; cursor: pointer; }
   button:hover { border-color: var(--gold); }
-  button.active { background: var(--gold); color: var(--bg); border-color: var(--gold); }
-  .tooltip { position: absolute; pointer-events: none; background: rgba(20, 18, 15, .92); border: 1px solid var(--line);
-    padding: 3px 8px; border-radius: 4px; font-size: 12px; display: none; white-space: nowrap; }
-  .banner { position: absolute; left: 50%; top: 56px; transform: translateX(-50%); background: var(--panel-2);
-    border: 1px solid var(--gold); border-radius: 8px; padding: 10px 14px; max-width: 520px; display: none; text-align: center; }
-  .banner p { margin: 0 0 8px; }
-  .settings { display: grid; gap: 8px; font-size: 13px; }
-  .settings label { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .settings input[type=range] { width: 140px; accent-color: var(--gold); }
-  .settings input[type=checkbox] { accent-color: var(--gold); }
-  .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
-  .row { display: flex; gap: 6px; flex-wrap: wrap; }
-  @media (max-width: 900px) {
+  button.active { border-color: var(--gold); color: var(--gold); }
+  .tooltip { position: absolute; pointer-events: none; background: rgba(0,0,0,.88); border: 1px solid var(--line-strong);
+    padding: 3px 8px; font-size: 13px; display: none; white-space: nowrap; }
+  .banner { position: absolute; left: 50%; top: 110px; transform: translateX(-50%); background: rgba(0,0,0,.9);
+    border: 1px solid var(--gold); padding: 12px 16px; max-width: 520px; display: none; text-align: center; }
+  .banner p { margin: 0 0 10px; }
+
+  /* mini map */
+  .mini-wrap { position: relative; }
+  #miniMap { display: block; width: 100%; aspect-ratio: 1; }
+  .mini-info { position: absolute; bottom: 2px; right: 4px; font-size: 11px; color: var(--muted); }
+
+  /* bars */
+  .bar { margin: 5px 0 7px; }
+  .bar-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); letter-spacing: .04em; }
+  .bar-top b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .track { position: relative; height: 9px; background: rgba(255,255,255,.07); border: 1px solid var(--line); }
+  .fill { position: absolute; top: 0; bottom: 0; left: 0; width: 0; transition: width .25s ease; }
+  .ticks { position: absolute; inset: 0; pointer-events: none; }
+  .ticks i { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgba(255,255,255,.35); }
+  .stage { font-size: 12px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .chip { font-size: 11px; letter-spacing: .06em; padding: 2px 7px; border: 1px solid var(--line); color: var(--dim); text-transform: uppercase; }
+  .chip.on { color: var(--ink); border-color: var(--gold); }
+  .chip.on.danger { color: #fff; border-color: var(--bad); background: rgba(208,87,76,.25); }
+
+  /* stats grid */
+  .bigstat { display: flex; align-items: baseline; justify-content: space-between; }
+  .bigstat .n { font-size: 28px; letter-spacing: .02em; }
+  .res { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; font-size: 12px; margin-top: 6px; }
+  .res span { display: flex; justify-content: space-between; color: var(--muted); }
+  .res b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+  /* lists (SkyUI style) */
+  .list { display: flex; flex-direction: column; }
+  .row { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 5px 2px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .row:last-child { border-bottom: 0; }
+  .ico { position: relative; width: 30px; height: 30px; }
+  .ico img { width: 100%; height: 100%; object-fit: contain; }
+  .ico .emb { position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; }
+  .ico.fallback { border: 1px solid var(--line); border-radius: 50%; }
+  .row .name { font-size: 14px; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .right { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row.bad .name { color: #ffb3aa; }
+  .row.inactive { opacity: .45; }
+  .tbar { height: 3px; background: rgba(255,255,255,.1); margin-top: 3px; }
+  .tbar i { display: block; height: 100%; background: var(--ink); }
+  .row.bad .tbar i { background: var(--bad); }
+  .row .desc { grid-column: 2 / 4; font-size: 12px; color: var(--muted); margin-top: -2px; white-space: normal; }
+  .group-h { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 8px 0 2px; }
+  .group-h:first-child { margin-top: 0; }
+  .count { font-size: 15px; }
+  .count.low { color: var(--bad); }
+  .toggle { font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: pointer; letter-spacing: .04em; text-transform: none; }
+  .toggle input { accent-color: var(--gold); }
+
+  @media (max-width: 1200px) {
     html, body { overflow: auto; }
     .app { grid-template-columns: 1fr; height: auto; }
-    .main { height: 70vh; border-right: 0; border-bottom: 1px solid var(--line); }
+    .center { height: 65vh; order: -1; }
+    .col { overflow: visible; }
   }
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="main">
+  <!-- LEFT: effects + consumables -->
+  <aside class="col" id="colLeft">
+    <section class="panel">
+      <h2>Active Effects <label class="toggle"><input type="checkbox" id="setHidden"> hidden</label></h2>
+      <div class="list" id="effects"><div class="empty">No active effects</div></div>
+    </section>
+    <section class="panel">
+      <h2>Consumables <small id="consTotal"></small></h2>
+      <div class="list" id="consumables"><div class="empty">Nothing to show yet</div></div>
+    </section>
+  </aside>
+
+  <!-- CENTER: world map -->
+  <main class="center">
     <canvas id="worldMap"></canvas>
-    <div class="status"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
-    <div class="where">
-      <div class="big" id="whereBig">—</div>
-      <div class="small" id="whereSmall"></div>
+    <div class="hud-top">
+      <div>
+        <div class="loc-big" id="whereBig">—</div>
+        <div class="loc-small" id="whereSmall"></div>
+      </div>
+      <div class="clock"><div class="t" id="clockT">—</div><div class="d" id="clockD"></div></div>
     </div>
+    <div class="compass"><div class="strip" id="compassStrip"></div><div class="needle"></div></div>
     <div class="banner" id="banner"></div>
     <div class="toolbar">
-      <button id="btnFollow" class="active">Follow player</button>
-      <button id="btnFit">Show whole map</button>
+      <button id="btnFollow" class="active">Follow</button>
+      <button id="btnFit">Whole map</button>
+      <button id="btnSpoil">Undiscovered: off</button>
       <button id="btnTrailClear">Clear trail</button>
     </div>
+    <div class="status"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
     <div class="tooltip" id="tooltip"></div>
-  </div>
+  </main>
 
-  <aside class="side">
-    <section class="card">
-      <h2>Mini map <small id="miniInfo"></small></h2>
+  <!-- RIGHT: mini map, vitals, survival, gear -->
+  <aside class="col" id="colRight">
+    <section class="panel mini-wrap">
+      <h2>Local <small id="miniTitle"></small></h2>
       <canvas id="miniMap"></canvas>
+      <div class="mini-info" id="miniInfo"></div>
     </section>
 
-    <section class="card">
-      <h2>Character <small id="charLevel"></small></h2>
+    <section class="panel">
+      <h2>Vitals <small id="charLevel"></small></h2>
       <div class="bar"><div class="bar-top"><span>Health</span><b id="hpText">—</b></div><div class="track"><div class="fill" id="hpFill" style="background:var(--health)"></div></div></div>
       <div class="bar"><div class="bar-top"><span>Magicka</span><b id="mpText">—</b></div><div class="track"><div class="fill" id="mpFill" style="background:var(--magicka)"></div></div></div>
       <div class="bar"><div class="bar-top"><span>Stamina</span><b id="spText">—</b></div><div class="track"><div class="fill" id="spFill" style="background:var(--stamina)"></div></div></div>
       <div class="chips">
-        <span class="chip" id="chipCombat">In combat</span>
+        <span class="chip" id="chipCombat">Combat</span>
         <span class="chip" id="chipSneak">Sneaking</span>
         <span class="chip" id="chipMount">Mounted</span>
       </div>
     </section>
 
-    <section class="card">
-      <h2>Readouts</h2>
-      <dl class="kv">
-        <dt>Time</dt><dd id="rTime">—</dd>
-        <dt>Date</dt><dd id="rDate">—</dd>
-        <dt>Heading</dt><dd id="rHeading">—</dd>
-        <dt>Gold</dt><dd id="rGold">—</dd>
-        <dt>Position</dt><dd id="rPos">—</dd>
-        <dt>Discovered</dt><dd id="rDisc">—</dd>
-        <dt>Nearest</dt><dd id="rNearest">—</dd>
-      </dl>
+    <section class="panel" id="survivalPanel">
+      <h2>Survival <small id="ambient"></small></h2>
+      <div id="survival"><div class="empty">Survival Mode not detected</div></div>
     </section>
 
-    <section class="card">
-      <h2>Local map <small id="localInfo"></small></h2>
-      <canvas id="localMap"></canvas>
-      <p class="hint">Traces where you've walked in the current area, plus nearby map markers outdoors.</p>
-    </section>
-
-    <section class="card">
-      <h2>Map picture</h2>
-      <div class="row">
-        <button id="btnLoadImg">Load map image…</button>
-        <button id="btnCalibrate">Line it up</button>
-        <button id="btnClearImg">Remove</button>
-      </div>
-      <input type="file" id="fileImg" accept="image/*" hidden>
-      <p class="hint" id="imgHint">Optional. Use a screenshot of your in-game world map or any map picture you own. "Line it up" matches it to the game in two clicks.</p>
-    </section>
-
-    <section class="card">
-      <h2>Settings</h2>
-      <div class="settings">
-        <label>Rotate mini map with player <input type="checkbox" id="setRotate" checked></label>
-        <label>Mini map zoom <input type="range" id="setMiniZoom" min="1" max="10" value="5"></label>
-        <label>Show undiscovered places (spoilers) <input type="checkbox" id="setSpoilers"></label>
-        <label>Show all labels <input type="checkbox" id="setLabels"></label>
-      </div>
+    <section class="panel">
+      <h2>Equipment <small id="gold"></small></h2>
+      <div class="bigstat"><span class="muted">Armor rating</span><span class="n" id="armorRating">—</span></div>
+      <div class="res" id="resists"></div>
+      <div class="bar" style="margin-top:10px"><div class="bar-top"><span>Carry weight</span><b id="carryText">—</b></div><div class="track"><div class="fill" id="carryFill" style="background:var(--gold)"></div></div></div>
+      <div class="list" id="equipment"><div class="empty">Nothing equipped</div></div>
     </section>
   </aside>
 </div>
@@ -159,698 +204,623 @@
 (() => {
   "use strict";
 
-  // ---------- small helpers ----------
+  // ---------- helpers ----------
   const $ = (id) => document.getElementById(id);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const store = {
-    get(key, fallback) { try { const v = localStorage.getItem("sc." + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } },
-    set(key, value) { try { localStorage.setItem("sc." + key, JSON.stringify(value)); } catch {} },
-    del(key) { try { localStorage.removeItem("sc." + key); } catch {} }
+    get(k, d) { try { const v = localStorage.getItem("sc2." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("sc2." + k, JSON.stringify(v)); } catch {} }
   };
+  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:7171";
+  const ASSETS = "assets/";
 
-  // Map picture blobs can be large, so they live in IndexedDB instead of localStorage.
-  const imageDb = {
-    open() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open("skyrim-companion", 1);
-        req.onupgradeneeded = () => req.result.createObjectStore("images");
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
-    },
-    async put(key, blob) {
-      const db = await this.open();
-      return new Promise((res, rej) => { const tx = db.transaction("images", "readwrite"); tx.objectStore("images").put(blob, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
-    },
-    async get(key) {
-      const db = await this.open();
-      return new Promise((res, rej) => { const r = db.transaction("images").objectStore("images").get(key); r.onsuccess = () => res(r.result || null); r.onerror = () => rej(r.error); });
-    },
-    async del(key) {
-      const db = await this.open();
-      return new Promise((res) => { const tx = db.transaction("images", "readwrite"); tx.objectStore("images").delete(key); tx.oncomplete = res; tx.onerror = res; });
+  // Image cache that remembers failures, so missing icons fall back quietly.
+  const imgCache = new Map();
+  function img(path) {
+    let e = imgCache.get(path);
+    if (!e) {
+      e = { el: new Image(), ok: false, failed: false };
+      e.el.onload = () => { e.ok = true; };
+      e.el.onerror = () => { e.failed = true; };
+      e.el.src = ASSETS + path;
+      imgCache.set(path, e);
     }
+    return e;
+  }
+
+  // ---------- map marker icons (CoMAP / Map Marker Framework) ----------
+  const iconDefs = new Map();   // definition name -> { exportName, undiscovered, scale }
+  const refIcons = new Map();   // "plugin|hex" -> { iconName } or { icon }
+  const typeScale = new Map();  // vanilla index -> scale
+  const normRef = (r) => {
+    const [p, id] = String(r).split("|");
+    return p && id ? p.trim().toLowerCase() + "|" + parseInt(id, 16).toString(16) : "";
   };
+  function stripJsonComments(text) {
+    let out = "", inStr = false, i = 0;
+    while (i < text.length) {
+      const c = text[i], n = text[i + 1];
+      if (inStr) { out += c; if (c === "\\") { out += n ?? ""; i += 2; continue; } if (c === '"') inStr = false; i++; continue; }
+      if (c === '"') { inStr = true; out += c; i++; continue; }
+      if (c === "/" && n === "/") { while (i < text.length && text[i] !== "\n") i++; continue; }
+      if (c === "/" && n === "*") { i += 2; while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++; i += 2; continue; }
+      out += c; i++;
+    }
+    return out.replace(/,\s*([\]}])/g, "$1");
+  }
+  function loadMarkerConfigs(files) {
+    // Skyrim.json defines the base set; load it first, then everything else alphabetically.
+    const names = Object.keys(files).sort((a, b) => (a === "Skyrim.json" ? -1 : b === "Skyrim.json" ? 1 : a.localeCompare(b)));
+    for (const name of names) {
+      let cfg;
+      try { cfg = JSON.parse(stripJsonComments(files[name])); } catch { continue; }
+      for (const d of cfg.iconDefinitions || []) {
+        if (d.name && d.source && d.source.exportNames) {
+          iconDefs.set(d.name, { exportName: d.source.exportNames[0], undiscovered: d.source.exportNames[1] || d.source.exportNames[0], scale: d.scale || 1 });
+        } else if (typeof d.index === "number" && d.scale) {
+          typeScale.set(d.index, d.scale);
+        }
+      }
+      for (const m of cfg.mapMarkers || []) {
+        const key = normRef(m.refID);
+        if (!key) continue;
+        if (m.iconName) refIcons.set(key, { iconName: m.iconName });
+        else if (typeof m.icon === "number") refIcons.set(key, { icon: m.icon });
+      }
+    }
+  }
+  const safeFile = (s) => String(s).replace(/[^A-Za-z0-9 _-]/g, "_");
+  function markerIcon(m) {
+    const assign = m.ref ? refIcons.get(normRef(m.ref)) : null;
+    let file, scale = 1;
+    if (assign && assign.iconName && iconDefs.has(assign.iconName)) {
+      const d = iconDefs.get(assign.iconName);
+      file = m.discovered ? d.exportName : d.undiscovered; scale = d.scale;
+    } else {
+      const type = assign && typeof assign.icon === "number" ? assign.icon : m.type;
+      if (type >= 1 && type <= 59) { file = "CoMAP " + type + (m.discovered ? "" : " Undiscovered"); scale = typeScale.get(type) || 1; }
+    }
+    return file ? { e: img("markers/" + safeFile(file) + ".png"), scale } : null;
+  }
+  // Fallback shapes when an icon is missing.
+  const CITY = new Set([1]), TOWN = new Set([2, 3, 54]);
+  function drawFallbackMarker(ctx, x, y, m, size) {
+    const r = CITY.has(m.type) ? size * 0.42 : TOWN.has(m.type) ? size * 0.34 : size * 0.26;
+    ctx.save(); ctx.globalAlpha = m.discovered ? 1 : 0.5;
+    ctx.fillStyle = "#2a241b"; ctx.strokeStyle = "#e9dcc0"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+  function drawMarker(ctx, x, y, m, size) {
+    const ic = markerIcon(m);
+    if (ic && ic.e.ok) {
+      const s = size * Math.min(1.6, ic.scale);
+      ctx.save(); ctx.globalAlpha = m.discovered ? 1 : 0.75;
+      ctx.drawImage(ic.e.el, x - s / 2, y - s / 2, s, s); ctx.restore();
+    } else drawFallbackMarker(ctx, x, y, m, size);
+  }
+  function drawPlayer(ctx, x, y, headingDeg, size) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(headingDeg * Math.PI / 180);
+    ctx.beginPath(); ctx.moveTo(0, -size); ctx.lineTo(size * 0.68, size * 0.78); ctx.lineTo(0, size * 0.38); ctx.lineTo(-size * 0.68, size * 0.78); ctx.closePath();
+    ctx.fillStyle = "#f6e7b8"; ctx.strokeStyle = "#1a140c"; ctx.lineWidth = 2.5; ctx.fill(); ctx.stroke(); ctx.restore();
+  }
 
-  // ---------- marker styling ----------
-  // Type numbers come from the game's map marker list.
-  const CITY = new Set([1]);
-  const TOWN = new Set([2, 3, 54]);
-  const DUNGEON = new Set([4, 6, 7, 8, 9, 12, 15, 22, 28, 31, 53, 56, 59]);
-  function markerStyle(type) {
-    if (CITY.has(type)) return { r: 6, shape: "square", color: "#e7c77c", label: 0 };
-    if (TOWN.has(type)) return { r: 4.5, shape: "square", color: "#d9c39b", label: 1 };
-    if (DUNGEON.has(type)) return { r: 4, shape: "tri", color: "#c98d6a", label: 2 };
-    return { r: 3, shape: "dot", color: "#b9ad97", label: 2 };
+  // ---------- SkyUI effect icon rules (ported from SkyUI's EffectIconMap) ----------
+  const ARCH = { 10: "conjure", 11: "invisibility", 12: "light", 17: "bound_item", 18: "conjure", 21: "paralysis", 25: "clairvoyance",
+    35: "cloak", 36: "werewolf", 37: "slow_time", 39: "ench_weapon", 41: "ethereal", 46: "vampire" };
+  const AVI = {};
+  const skills = ["av_skill_weapon_1h", "av_skill_weapon_2h", "av_skill_archery", "av_skill_block", "av_skill_smithing", "av_skill_armor_heavy",
+    "av_skill_armor_light", "av_skill_pickpocket", "av_skill_lockpicking", "av_skill_sneak", "av_skill_alchemy", "av_skill_persuasion",
+    "av_skill_alteration", "av_skill_conjuration", "av_skill_destruction", "av_skill_illusion", "av_skill_restoration", "av_skill_enchanting"];
+  skills.forEach((s, i) => { AVI[6 + i] = s; AVI[96 + i] = s; AVI[114 + i] = s; AVI[135 + i] = s; });
+  Object.assign(AVI, { 24: "av_health", 25: "av_magicka", 26: "av_stamina", 27: "av_health_regen", 28: "av_magicka_regen", 29: "av_stamina_regen",
+    30: "av_speedmult", 32: "av_carryweight", 34: "av_skill_unarmed", 35: "av_skill_unarmed", 39: "av_resist_damage", 40: "av_resist_poison",
+    41: "av_resist_fire", 42: "av_resist_shock", 43: "av_resist_frost", 44: "av_resist_magic", 45: "av_resist_disease", 53: "paralysis",
+    54: "invisibility", 55: "av_nighteye", 57: "av_waterbreathing", 58: "av_waterwalking", 63: "av_ward", 65: "av_armorperks", 78: "av_bow_speed",
+    83: "av_absorb", 85: "av_weapon_speed", 86: "av_skill_shout", 87: "av_bow_stagger", 92: "av_noise", 155: "av_health_regen",
+    156: "av_magicka_regen", 157: "av_stamina_regen" });
+  function effectIcon(e) {
+    let base = ARCH[e.archetype], emblem = null;
+    if (!base) {
+      if (e.archetype === 0 || e.archetype === 5 || e.archetype === 34) {
+        emblem = e.detrimental ? (e.recover ? "drain" : "damage") : (e.recover ? "fortify" : "restore");
+      }
+      base = AVI[e.av];
+      if (e.av === 24) {
+        if (e.resist === 41) base = "fire"; else if (e.resist === 43) base = "frost"; else if (e.resist === 42) base = "shock";
+      }
+      if (!base) base = "default_effect";
+    }
+    return { base, emblem };
   }
-  function drawMarker(ctx, x, y, st, dim) {
-    ctx.save();
-    ctx.globalAlpha = dim ? 0.35 : 1;
-    ctx.fillStyle = st.color;
-    ctx.strokeStyle = "#14120f";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    if (st.shape === "square") ctx.rect(x - st.r, y - st.r, st.r * 2, st.r * 2);
-    else if (st.shape === "tri") { ctx.moveTo(x, y - st.r - 1); ctx.lineTo(x + st.r, y + st.r); ctx.lineTo(x - st.r, y + st.r); ctx.closePath(); }
-    else ctx.arc(x, y, st.r, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
-  }
-  function drawArrow(ctx, x, y, headingDeg, size, color) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(headingDeg * Math.PI / 180);
-    ctx.beginPath();
-    ctx.moveTo(0, -size);
-    ctx.lineTo(size * 0.7, size * 0.8);
-    ctx.lineTo(0, size * 0.4);
-    ctx.lineTo(-size * 0.7, size * 0.8);
-    ctx.closePath();
-    ctx.fillStyle = color; ctx.strokeStyle = "#14120f"; ctx.lineWidth = 2;
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
+  function iconHtml(path, emblemPath) {
+    return `<div class="ico"><img src="${ASSETS}${esc(path)}" alt="" onerror="this.parentNode.classList.add('fallback');this.remove()">` +
+      (emblemPath ? `<img class="emb" src="${ASSETS}${esc(emblemPath)}" alt="" onerror="this.remove()">` : "") + `</div>`;
   }
 
-  // ---------- app state ----------
+  // ---------- SkyUI item icon rules (subset of InventoryIconSetter) ----------
+  const WEAPON_ICON = { 0: "default_weapon", 1: "weapon_sword", 2: "weapon_dagger", 3: "weapon_waraxe", 4: "weapon_mace", 5: "weapon_greatsword",
+    6: "weapon_battleaxe", 7: "weapon_bow", 8: "weapon_staff", 9: "weapon_crossbow" };
+  function armorIcon(slot, weight) {
+    const part = { head: "head", body: "body", hands: "hands", forearms: "forearms", feet: "feet", calves: "calves", shield: "shield" }[slot];
+    if (weight === "jewelry" || slot === "amulet" || slot === "ring") return slot === "ring" ? "armor_ring" : slot === "amulet" ? "armor_amulet" : "armor_circlet";
+    if (!part) return "default_armor";
+    if (weight === "light") return "lightarmor_" + part;
+    if (weight === "heavy") return "armor_" + part;
+    return "clothing_" + part;
+  }
+  function potionIcon(p) {
+    if (p.kind === "poison") return "potion_poison";
+    if (p.kind === "food") return "default_food";
+    const e = mainEffect(p);
+    if (!e) return "default_potion";
+    if ([24, 27, 155].includes(e.av)) return "potion_health";
+    if ([25, 28, 156].includes(e.av)) return "potion_magic";
+    if ([26, 29, 157].includes(e.av)) return "potion_stam";
+    if (e.av === 41) return "potion_fire";
+    if (e.av === 42) return "potion_shock";
+    if (e.av === 43) return "potion_frost";
+    return "default_potion";
+  }
+
+  // ---------- state ----------
   const app = {
-    demo: false,
-    connected: false,
-    state: null,          // latest snapshot from the game
-    shown: null,          // smoothed player position for drawing
-    markers: [],
-    worldspace: 0,
-    trail: store.get("trail", {}),   // worldspace/cell key -> [[x,y],...]
-    follow: true,
-    view: { x: 0, y: 0, scale: 0.004 }, // world map camera (game units)
-    img: null,            // { bitmap, w, h }
-    calib: null,          // { ax, bx, ay, by } maps game -> image pixels
-    picking: null,        // calibration step state
-    settings: Object.assign({ rotate: true, miniZoom: 5, spoilers: false, labels: false }, store.get("settings", {}))
+    demo: false, state: null, shown: null, markers: [], worldspace: 0, mapInfo: null, mapImg: null,
+    trail: store.get("trail", {}), follow: true, view: { x: 0, y: 0, scale: 0.005 },
+    settings: Object.assign({ spoilers: false, hidden: false }, store.get("settings", {})),
+    maps: null
   };
 
   // ---------- networking ----------
-  const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:7171";
-  let failures = 0;
-
+  let failures = 0, inflight = false;
   async function fetchJson(path) {
     const r = await fetch(BASE + path, { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
     return r.json();
   }
-
-  let inflight = false;
   async function pollState() {
     if (app.demo || inflight) return;
     inflight = true;
-    try {
-      const s = await fetchJson("/api/state");
-      failures = 0;
-      app.connected = true;
-      onState(s);
-    } catch {
-      failures++;
-      app.connected = false;
-      if (failures === 15) showOfflineBanner();
-      setConn("bad", "Game not reachable");
-    } finally {
-      inflight = false;
-    }
+    try { const s = await fetchJson("/api/state"); failures = 0; onState(s); }
+    catch { failures++; if (failures === 15) showOffline(); setConn("bad", "Game not reachable"); }
+    finally { inflight = false; }
   }
-
-  async function pollMarkers() {
-    if (app.demo) return;
-    try { onMarkers(await fetchJson("/api/markers")); } catch {}
-  }
-
-  function setConn(kind, text) { $("connDot").className = "dot " + kind; $("connText").textContent = text; }
-
-  function showOfflineBanner() {
+  async function pollMarkers() { if (!app.demo) try { onMarkers(await fetchJson("/api/markers")); } catch {} }
+  function setConn(k, t) { $("connDot").className = "dot " + k; $("connText").textContent = t; }
+  function showOffline() {
     const b = $("banner");
-    b.innerHTML = "<p>Can't reach the game. Make sure Skyrim is running through SKSE with the Skyrim Companion plugin installed, then this page connects by itself.</p><button id='btnDemo'>Try demo mode</button>";
+    b.innerHTML = "<p>Can't reach the game. Start Skyrim through SKSE with Skyrim Companion installed and this page connects by itself.</p><button id='btnDemo'>Try demo mode</button>";
     b.style.display = "block";
     $("btnDemo").onclick = startDemo;
   }
 
+  async function loadStatic() {
+    try { app.maps = await (await fetch(ASSETS + "map/maps.json", { cache: "no-store" })).json(); } catch { app.maps = {}; }
+    if (!app.demo) { try { loadMarkerConfigs(await fetchJson("/api/mapmarker-configs")); } catch {} }
+  }
+
   function onState(s) {
-    if (!s.ready) {
-      app.state = null;
-      setConn("wait", "Waiting for a loaded save…");
-      return;
-    }
-    $("banner").style.display = app.picking ? "block" : "none";
+    if (!s.ready) { app.state = null; setConn("wait", "Waiting for a loaded save…"); return; }
+    $("banner").style.display = "none";
     setConn("ok", app.demo ? "Demo mode" : "Live");
     const prev = app.state;
     app.state = s;
-    if (!app.shown) app.shown = { x: s.player.x, y: s.player.y, h: s.player.heading };
-
-    // Indoors there is no worldspace, so keep the last outdoor map loaded.
-    const ws = s.where.worldspaceId;
-    if (ws && ws !== app.worldspace) {
-      app.worldspace = ws;
-      loadCalibration();
-      loadImage();
-      if (app.markers.length && !s.where.interior) setTimeout(fitToMarkers, 0);
-    }
-    // A big jump means fast travel or a load door: snap instead of gliding across the map.
-    if (prev && Math.hypot(s.player.x - prev.player.x, s.player.y - prev.player.y) > 3000) {
+    if (!app.shown || (prev && Math.hypot(s.player.x - prev.player.x, s.player.y - prev.player.y) > 3000)) {
       app.shown = { x: s.player.x, y: s.player.y, h: s.player.heading };
     }
-    addTrailPoint(s);
-    updatePanels(s);
+    const ws = s.where.worldspaceId;
+    if (ws && ws !== app.worldspace) { app.worldspace = ws; selectMap(s.where.worldspaceEdid); }
+    addTrail(s);
+    renderPanels(s);
   }
-
   function onMarkers(m) {
-    const first = app.markers.length === 0;
+    const first = !app.markers.length;
     app.markers = m.markers || [];
-    if (first && app.markers.length) fitToMarkers();
+    if (first && app.markers.length && !app.follow) fitWorld();
+  }
+  function selectMap(edid) {
+    const info = app.maps && app.maps[edid];
+    app.mapInfo = info || null;
+    app.mapImg = info ? img(info.image) : null;
   }
 
-  // ---------- trail (breadcrumbs) ----------
-  function trailKey(s) { return s.where.interior ? "cell:" + s.where.cell : "ws:" + s.where.worldspaceId; }
+  // ---------- trail ----------
+  const trailKey = (s) => s.where.interior ? "cell:" + s.where.cell : "ws:" + s.where.worldspaceId;
   let lastSave = 0;
-  function addTrailPoint(s) {
-    const key = trailKey(s);
-    const pts = app.trail[key] || (app.trail[key] = []);
+  function addTrail(s) {
+    const pts = app.trail[trailKey(s)] || (app.trail[trailKey(s)] = []);
     const last = pts[pts.length - 1];
-    const minStep = s.where.interior ? 40 : 250;
-    if (!last || Math.hypot(last[0] - s.player.x, last[1] - s.player.y) > minStep) {
-      if (last && Math.hypot(last[0] - s.player.x, last[1] - s.player.y) > 3000) pts.push(null); // gap after teleport
-      pts.push([Math.round(s.player.x), Math.round(s.player.y)]);
-      if (pts.length > 4000) pts.splice(0, pts.length - 4000);
-    }
-    // Keep only the 30 most recent areas so storage stays small.
-    const keys = Object.keys(app.trail);
-    if (keys.length > 30) delete app.trail[keys[0]];
+    const step = s.where.interior ? 40 : 250;
+    const d = last ? Math.hypot(last[0] - s.player.x, last[1] - s.player.y) : Infinity;
+    if (d > step) { if (last && d > 3000) pts.push(null); pts.push([Math.round(s.player.x), Math.round(s.player.y)]); if (pts.length > 4000) pts.splice(0, pts.length - 4000); }
+    const keys = Object.keys(app.trail); if (keys.length > 30) delete app.trail[keys[0]];
     if (Date.now() - lastSave > 5000) { lastSave = Date.now(); store.set("trail", app.trail); }
   }
-
   function strokeTrail(ctx, pts, toScreen, color, width) {
     if (!pts || pts.length < 2) return;
-    ctx.save();
-    ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = "round"; ctx.lineCap = "round";
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    let pen = false;
-    for (const p of pts) {
-      if (!p) { pen = false; continue; }
-      const [sx, sy] = toScreen(p[0], p[1]);
-      if (pen) ctx.lineTo(sx, sy); else { ctx.moveTo(sx, sy); pen = true; }
-    }
-    ctx.stroke();
-    ctx.restore();
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = ctx.lineCap = "round"; ctx.setLineDash([2, 5]);
+    ctx.beginPath(); let pen = false;
+    for (const p of pts) { if (!p) { pen = false; continue; } const [x, y] = toScreen(p[0], p[1]); if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; } }
+    ctx.stroke(); ctx.restore();
   }
-
-  // ---------- map picture + calibration ----------
-  function imgKey() { return "ws-" + app.worldspace; }
-  function loadCalibration() { app.calib = store.get("calib." + imgKey(), null); }
-
-  async function loadImage() {
-    app.img = null;
-    try {
-      const blob = await imageDb.get(imgKey());
-      if (!blob) { updateImgHint(); return; }
-      const bitmap = await createImageBitmap(blob);
-      app.img = { bitmap, w: bitmap.width, h: bitmap.height };
-      if (!app.calib) defaultCalibration();
-    } catch {}
-    updateImgHint();
-  }
-
-  // Before lining it up, stretch the picture over the area the markers cover.
-  function defaultCalibration() {
-    if (!app.img) return;
-    const b = markerBounds();
-    if (!b) { app.calib = { ax: 0.01, bx: app.img.w / 2, ay: -0.01, by: app.img.h / 2 }; return; }
-    const ax = app.img.w / (b.maxX - b.minX), ay = -app.img.h / (b.maxY - b.minY);
-    app.calib = { ax, bx: -ax * b.minX, ay, by: -ay * b.maxY };
-  }
-
-  function updateImgHint() {
-    const h = $("imgHint");
-    if (!app.img) h.textContent = "Optional. Use a screenshot of your in-game world map or any map picture you own. \"Line it up\" matches it to the game in two clicks.";
-    else if (!store.get("calib." + imgKey(), null)) h.textContent = "Picture loaded but not lined up yet. Press \"Line it up\".";
-    else h.textContent = "Picture lined up for this world. Saved on this computer.";
-  }
-
-  $("btnLoadImg").onclick = () => $("fileImg").click();
-  $("fileImg").onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    await imageDb.put(imgKey(), file);
-    store.del("calib." + imgKey());
-    app.calib = null;
-    await loadImage();
-    e.target.value = "";
-  };
-  $("btnClearImg").onclick = async () => {
-    await imageDb.del(imgKey());
-    store.del("calib." + imgKey());
-    app.img = null; app.calib = null;
-    updateImgHint();
-  };
-
-  // Two-click line-up: pick a known place, click it on the picture, repeat once.
-  $("btnCalibrate").onclick = () => {
-    if (!app.img) { alert("Load a map picture first."); return; }
-    const named = app.markers.filter(m => m.name && (m.seen || app.settings.spoilers || app.demo));
-    if (named.length < 2) { alert("Need at least two known places on the map first. Load a save and wait a few seconds."); return; }
-    app.picking = { step: 0, pairs: [], options: named.sort((a, b) => a.name.localeCompare(b.name)) };
-    app.follow = false; $("btnFollow").classList.remove("active");
-    renderPickBanner();
-  };
-
-  function renderPickBanner() {
-    const p = app.picking, b = $("banner");
-    if (!p) { b.style.display = "none"; return; }
-    const suggestion = p.step === 0 ? cornerPick(p.options, -1) : cornerPick(p.options, 1);
-    const opts = p.options.map((m, i) => `<option value="${i}" ${m === suggestion ? "selected" : ""}>${escapeHtml(m.name)}</option>`).join("");
-    b.innerHTML = `<p><b>Line up the picture (${p.step + 1} of 2)</b><br>Choose a place, then click exactly where it is drawn on your map picture. Pick two places far apart.</p>
-      <div class="row" style="justify-content:center"><select id="pickSel">${opts}</select><button id="pickCancel">Cancel</button></div>`;
-    b.style.display = "block";
-    $("pickCancel").onclick = () => { app.picking = null; $("worldMap").classList.remove("picking"); renderPickBanner(); };
-    $("worldMap").classList.add("picking");
-  }
-
-  // Suggest places near opposite corners so the line-up is accurate.
-  function cornerPick(list, dir) {
-    let best = list[0], bestScore = -Infinity;
-    for (const m of list) {
-      const score = dir * (m.x - m.y);
-      if (score > bestScore && (!app.picking.pairs[0] || app.picking.pairs[0].m !== m)) { best = m; bestScore = score; }
-    }
-    return best;
-  }
-
-  function finishPick(imgX, imgY) {
-    const p = app.picking;
-    const m = p.options[Number($("pickSel").value)];
-    p.pairs.push({ m, ix: imgX, iy: imgY });
-    if (p.pairs.length < 2) { p.step = 1; renderPickBanner(); return; }
-    const [a, b] = p.pairs;
-    const dx = b.m.x - a.m.x, dy = b.m.y - a.m.y;
-    if (Math.abs(dx) < 1000 || Math.abs(dy) < 1000) {
-      alert("Those two places are too close together, or lined up straight across. Try two places far apart diagonally.");
-      p.pairs = []; p.step = 0; renderPickBanner(); return;
-    }
-    const ax = (b.ix - a.ix) / dx, ay = (b.iy - a.iy) / dy;
-    app.calib = { ax, bx: a.ix - ax * a.m.x, ay, by: a.iy - ay * a.m.y };
-    store.set("calib." + imgKey(), app.calib);
-    app.picking = null;
-    $("worldMap").classList.remove("picking");
-    renderPickBanner();
-    updateImgHint();
-  }
-
-  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   // ---------- world map ----------
-  const world = $("worldMap");
-  const wctx = world.getContext("2d");
-
-  function markerBounds() {
-    if (!app.markers.length) return null;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const m of app.markers) { minX = Math.min(minX, m.x); maxX = Math.max(maxX, m.x); minY = Math.min(minY, m.y); maxY = Math.max(maxY, m.y); }
-    if (maxX - minX < 1 || maxY - minY < 1) return null;
-    return { minX, minY, maxX, maxY };
-  }
-
-  function fitToMarkers() {
-    const b = markerBounds();
-    if (!b) return;
+  const world = $("worldMap"), wctx = world.getContext("2d");
+  const W2S = (x, y) => [(x - app.view.x) * app.view.scale + world.clientWidth / 2, -(y - app.view.y) * app.view.scale + world.clientHeight / 2];
+  const S2W = (sx, sy) => [(sx - world.clientWidth / 2) / app.view.scale + app.view.x, -(sy - world.clientHeight / 2) / app.view.scale + app.view.y];
+  const visible = () => app.markers.filter(m => app.settings.spoilers || m.seen || m.discovered);
+  function fitWorld() {
     const w = world.clientWidth, h = world.clientHeight;
-    app.view.x = (b.minX + b.maxX) / 2;
-    app.view.y = (b.minY + b.maxY) / 2;
-    app.view.scale = Math.min(w / (b.maxX - b.minX), h / (b.maxY - b.minY)) * 0.9;
-    if (app.img && !store.get("calib." + imgKey(), null)) defaultCalibration();
-  }
-
-  const worldToScreen = (x, y) => [
-    (x - app.view.x) * app.view.scale + world.clientWidth / 2,
-    -(y - app.view.y) * app.view.scale + world.clientHeight / 2
-  ];
-  const screenToWorld = (sx, sy) => [
-    (sx - world.clientWidth / 2) / app.view.scale + app.view.x,
-    -(sy - world.clientHeight / 2) / app.view.scale + app.view.y
-  ];
-
-  function drawGrid(ctx, w, h, toScreen, step) {
-    ctx.save();
-    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--map-grid");
-    ctx.lineWidth = 1;
-    const [x0, y1] = screenToWorldGeneric(0, 0), [x1, y0] = screenToWorldGeneric(w, h);
-    function screenToWorldGeneric(sx, sy) { return toScreen.inverse(sx, sy); }
-    for (let x = Math.floor(x0 / step) * step; x <= x1; x += step) { const [sx] = toScreen(x, 0); ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke(); }
-    for (let y = Math.floor(y0 / step) * step; y <= y1; y += step) { const [, sy] = toScreen(0, y); ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke(); }
-    ctx.restore();
-  }
-
-  function visibleMarkers() {
-    return app.markers.filter(m => app.settings.spoilers || m.seen || m.discovered);
-  }
-
-  function drawWorld() {
-    const w = world.clientWidth, h = world.clientHeight, ctx = wctx;
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--map-bg");
-    ctx.fillRect(0, 0, w, h);
-
-    const s = app.state;
-    if (app.follow && app.shown) { app.view.x = app.shown.x; app.view.y = app.shown.y; }
-
-    // map picture
-    if (app.img && app.calib) {
-      const c = app.calib;
-      const gx0 = (0 - c.bx) / c.ax, gy0 = (0 - c.by) / c.ay;
-      const gx1 = (app.img.w - c.bx) / c.ax, gy1 = (app.img.h - c.by) / c.ay;
-      const [sx0, sy0] = worldToScreen(gx0, gy0), [sx1, sy1] = worldToScreen(gx1, gy1);
-      ctx.drawImage(app.img.bitmap, Math.min(sx0, sx1), Math.min(sy0, sy1), Math.abs(sx1 - sx0), Math.abs(sy1 - sy0));
-    } else {
-      const toScreen = Object.assign((x, y) => worldToScreen(x, y), { inverse: screenToWorld });
-      drawGrid(ctx, w, h, toScreen, 4096 * 4); // 4 exterior cells per square
-    }
-
-    if (s && !s.where.interior) strokeTrail(ctx, app.trail[trailKey(s)], worldToScreen, "rgba(201,164,92,.75)", 2);
-
-    // markers
-    const showAll = app.settings.labels || app.view.scale > 0.012;
-    ctx.font = "12px Segoe UI, sans-serif";
-    ctx.textAlign = "center";
-    for (const m of visibleMarkers()) {
-      const [x, y] = worldToScreen(m.x, m.y);
-      if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
-      const st = markerStyle(m.type);
-      drawMarker(ctx, x, y, st, !m.discovered);
-      const wantLabel = st.label === 0 || (st.label === 1 && app.view.scale > 0.006) || showAll;
-      if (wantLabel && m.name) {
-        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(20,18,15,.85)"; ctx.fillStyle = m.discovered ? "#efe6d4" : "#a39782";
-        ctx.strokeText(m.name, x, y - st.r - 5); ctx.fillText(m.name, x, y - st.r - 5);
-      }
-    }
-
-    // calibration picks
-    if (app.picking) for (const p of app.picking.pairs) {
-      const c = app.calib;
-      const [x, y] = worldToScreen((p.ix - c.bx) / c.ax, (p.iy - c.by) / c.ay);
-      ctx.strokeStyle = "#c9a45c"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.stroke();
-    }
-
-    // player
-    if (s && app.shown && !s.where.interior) {
-      const [x, y] = worldToScreen(app.shown.x, app.shown.y);
-      ctx.fillStyle = "rgba(201,164,92,.18)"; ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.fill();
-      drawArrow(ctx, x, y, app.shown.h, 11, "#f3d58a");
-    }
-  }
-
-  // pan / zoom / pick
-  let drag = null;
-  world.addEventListener("mousedown", (e) => {
-    if (app.picking) {
-      const r = world.getBoundingClientRect();
-      const [gx, gy] = screenToWorld(e.clientX - r.left, e.clientY - r.top);
-      const c = app.calib;
-      finishPick(c.ax * gx + c.bx, c.ay * gy + c.by);
+    if (app.mapInfo) {
+      // The drawn land fills roughly the middle 87% x 58% of the paper map image.
+      app.view.x = app.mapInfo.cx + app.mapInfo.span * 0.015; app.view.y = app.mapInfo.cy - app.mapInfo.span * 0.015;
+      app.view.scale = Math.min(w / (app.mapInfo.span * 0.9), h / (app.mapInfo.span * 0.62));
       return;
     }
-    drag = { x: e.clientX, y: e.clientY, vx: app.view.x, vy: app.view.y, moved: false };
-    world.classList.add("dragging");
-  });
+    if (!app.markers.length) return;
+    let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
+    for (const m of app.markers) { a = Math.min(a, m.x); c = Math.max(c, m.x); b = Math.min(b, m.y); d = Math.max(d, m.y); }
+    app.view.x = (a + c) / 2; app.view.y = (b + d) / 2; app.view.scale = Math.min(w / (c - a || 1), h / (d - b || 1)) * 0.9;
+  }
+  // Paper map placement: image pixel = (0.5 + (X - cx) / span) * size, (0.5 - (Y - cy) / span) * size
+  function drawMapImage(ctx, toScreen) {
+    if (!app.mapInfo || !app.mapImg || !app.mapImg.ok) return false;
+    const { span, cx, cy } = app.mapInfo;
+    const [x0, y0] = toScreen(cx - span / 2, cy + span / 2), [x1, y1] = toScreen(cx + span / 2, cy - span / 2);
+    ctx.drawImage(app.mapImg.el, x0, y0, x1 - x0, y1 - y0);
+    return true;
+  }
+  function drawWorld() {
+    const w = world.clientWidth, h = world.clientHeight, ctx = wctx, s = app.state;
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+    if (app.follow && app.shown) { app.view.x = app.shown.x; app.view.y = app.shown.y; }
+    if (!drawMapImage(ctx, W2S)) {
+      ctx.strokeStyle = "rgba(255,255,255,.05)"; ctx.lineWidth = 1;
+      const step = 16384, [gx0, gy1] = S2W(0, 0), [gx1, gy0] = S2W(w, h);
+      for (let x = Math.floor(gx0 / step) * step; x <= gx1; x += step) { const [sx] = W2S(x, 0); ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke(); }
+      for (let y = Math.floor(gy0 / step) * step; y <= gy1; y += step) { const [, sy] = W2S(0, y); ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke(); }
+    }
+    if (s && !s.where.interior) strokeTrail(ctx, app.trail[trailKey(s)], W2S, "rgba(120,20,10,.85)", 2.5);
+
+    const size = clamp(app.view.scale * 2600, 16, 34);
+    const showLabels = app.view.scale > 0.01;
+    ctx.font = "13px " + getComputedStyle(document.body).fontFamily; ctx.textAlign = "center";
+    for (const m of visible()) {
+      const [x, y] = W2S(m.x, m.y);
+      if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
+      drawMarker(ctx, x, y, m, size);
+      if (showLabels && m.name && m.discovered) {
+        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.8)"; ctx.fillStyle = "#f2efe8";
+        ctx.strokeText(m.name, x, y + size * 0.5 + 13); ctx.fillText(m.name, x, y + size * 0.5 + 13);
+      }
+    }
+    if (s && app.shown && !s.where.interior) {
+      const [x, y] = W2S(app.shown.x, app.shown.y);
+      drawPlayer(ctx, x, y, app.shown.h, 13);
+    }
+  }
+  let drag = null;
+  world.addEventListener("mousedown", (e) => { drag = { x: e.clientX, y: e.clientY, vx: app.view.x, vy: app.view.y }; world.classList.add("dragging"); });
   window.addEventListener("mousemove", (e) => {
     if (drag) {
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) {
-        drag.moved = true;
-        if (app.follow) { app.follow = false; $("btnFollow").classList.remove("active"); }
-      }
-      app.view.x = drag.vx - dx / app.view.scale;
-      app.view.y = drag.vy + dy / app.view.scale;
+      if (Math.abs(dx) + Math.abs(dy) > 3 && app.follow) { app.follow = false; $("btnFollow").classList.remove("active"); }
+      if (!app.follow) { app.view.x = drag.vx - dx / app.view.scale; app.view.y = drag.vy + dy / app.view.scale; }
     }
-    updateTooltip(e);
+    hoverTip(e);
   });
   window.addEventListener("mouseup", () => { drag = null; world.classList.remove("dragging"); });
   world.addEventListener("wheel", (e) => {
     e.preventDefault();
-    const r = world.getBoundingClientRect();
-    const mx = e.clientX - r.left, my = e.clientY - r.top;
-    const [gx, gy] = screenToWorld(mx, my);
-    app.view.scale = clamp(app.view.scale * Math.exp(-e.deltaY * 0.0015), 0.0004, 0.2);
-    if (!app.follow) {
-      const [nx, ny] = screenToWorld(mx, my);
-      app.view.x += gx - nx; app.view.y += gy - ny;
-    }
+    const r = world.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, [gx, gy] = S2W(mx, my);
+    app.view.scale = clamp(app.view.scale * Math.exp(-e.deltaY * 0.0015), 0.0006, 0.08);
+    if (!app.follow) { const [nx, ny] = S2W(mx, my); app.view.x += gx - nx; app.view.y += gy - ny; }
   }, { passive: false });
-
-  function updateTooltip(e) {
-    const tip = $("tooltip");
-    const r = world.getBoundingClientRect();
-    const mx = e.clientX - r.left, my = e.clientY - r.top;
-    if (mx < 0 || my < 0 || mx > r.width || my > r.height || drag) { tip.style.display = "none"; return; }
-    let best = null, bestD = 10;
-    for (const m of visibleMarkers()) {
-      const [x, y] = worldToScreen(m.x, m.y);
-      const d = Math.hypot(x - mx, y - my);
-      if (d < bestD) { best = m; bestD = d; }
-    }
+  function hoverTip(e) {
+    const tip = $("tooltip"), r = world.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    if (drag || mx < 0 || my < 0 || mx > r.width || my > r.height) { tip.style.display = "none"; return; }
+    let best = null, bd = 14;
+    for (const m of visible()) { const [x, y] = W2S(m.x, m.y), d = Math.hypot(x - mx, y - my); if (d < bd) { bd = d; best = m; } }
     if (!best) { tip.style.display = "none"; return; }
-    tip.textContent = (best.name || "Unnamed place") + (best.discovered ? "" : " (not discovered)");
+    tip.textContent = (best.name || "Unknown") + (best.discovered ? "" : " (undiscovered)");
     tip.style.left = (mx + 14) + "px"; tip.style.top = (my + 10) + "px"; tip.style.display = "block";
   }
-
   $("btnFollow").onclick = () => { app.follow = !app.follow; $("btnFollow").classList.toggle("active", app.follow); };
-  $("btnFit").onclick = () => { app.follow = false; $("btnFollow").classList.remove("active"); fitToMarkers(); };
+  $("btnFit").onclick = () => { app.follow = false; $("btnFollow").classList.remove("active"); fitWorld(); };
   $("btnTrailClear").onclick = () => { app.trail = {}; store.set("trail", app.trail); };
+  function syncSpoil() { $("btnSpoil").textContent = "Undiscovered: " + (app.settings.spoilers ? "on" : "off"); $("btnSpoil").classList.toggle("active", app.settings.spoilers); }
+  $("btnSpoil").onclick = () => { app.settings.spoilers = !app.settings.spoilers; store.set("settings", app.settings); syncSpoil(); };
+  syncSpoil();
 
   // ---------- mini map ----------
   const mini = $("miniMap"), mctx = mini.getContext("2d");
   function drawMini() {
-    const w = mini.clientWidth, h = mini.clientHeight, ctx = mctx;
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--map-bg");
-    ctx.fillRect(0, 0, w, h);
-    const s = app.state;
-    if (!s || !app.shown) { centerText(ctx, w, h, "No player yet"); return; }
-    if (s.where.interior) { centerText(ctx, w, h, "Indoors: see local map"); return; }
-
-    const radius = 3000 * app.settings.miniZoom;      // game units from center to edge
-    const scale = (Math.min(w, h) / 2) / radius;
-    const rot = app.settings.rotate ? -app.shown.h * Math.PI / 180 : 0;
-    const cos = Math.cos(rot), sin = Math.sin(rot);
-    const toScreen = (x, y) => {
-      const dx = (x - app.shown.x) * scale, dy = -(y - app.shown.y) * scale;
-      return [dx * cos - dy * sin + w / 2, dx * sin + dy * cos + h / 2];
-    };
-
-    ctx.save();
-    ctx.beginPath(); ctx.arc(w / 2, h / 2, Math.min(w, h) / 2 - 2, 0, Math.PI * 2); ctx.clip();
-
-    if (app.img && app.calib) {
-      const c = app.calib;
-      ctx.save();
-      ctx.translate(w / 2, h / 2);
-      ctx.rotate(rot);
-      // image pixel -> game -> mini: scale relative to the game, offset to player
-      const pxPerGameX = c.ax, pxPerGameY = c.ay;
-      ctx.scale(scale / pxPerGameX, -scale / pxPerGameY);
-      ctx.translate(-(c.ax * app.shown.x + c.bx), -(c.ay * app.shown.y + c.by));
-      ctx.drawImage(app.img.bitmap, 0, 0);
+    const w = mini.clientWidth, h = mini.clientHeight, ctx = mctx, s = app.state, R = Math.min(w, h) / 2 - 2;
+    ctx.clearRect(0, 0, w, h);
+    ctx.save(); ctx.beginPath(); ctx.arc(w / 2, h / 2, R, 0, Math.PI * 2); ctx.clip();
+    ctx.fillStyle = "#161310"; ctx.fillRect(0, 0, w, h);
+    if (!s || !app.shown) { ctx.restore(); ring(ctx, w, h, R); return; }
+    const indoors = s.where.interior;
+    const pts = app.trail[trailKey(s)] || [];
+    let radius = 24000;
+    if (indoors) { radius = 600; for (const p of pts) if (p) radius = Math.max(radius, Math.hypot(p[0] - app.shown.x, p[1] - app.shown.y) + 200); radius = Math.min(radius, 6000); }
+    const scale = R / radius, rot = -app.shown.h * Math.PI / 180, cos = Math.cos(rot), sin = Math.sin(rot);
+    const toScreen = (x, y) => { const dx = (x - app.shown.x) * scale, dy = -(y - app.shown.y) * scale; return [dx * cos - dy * sin + w / 2, dx * sin + dy * cos + h / 2]; };
+    if (!indoors && app.mapInfo && app.mapImg && app.mapImg.ok) {
+      ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(rot);
+      const { span, cx, cy } = app.mapInfo, k = scale * span;
+      ctx.drawImage(app.mapImg.el, ((cx - span / 2) - app.shown.x) * scale, -((cy + span / 2) - app.shown.y) * scale, k, k);
       ctx.restore();
     }
-
-    strokeTrail(ctx, app.trail[trailKey(s)], toScreen, "rgba(201,164,92,.85)", 2);
-
-    ctx.font = "11px Segoe UI, sans-serif"; ctx.textAlign = "center";
-    for (const m of visibleMarkers()) {
-      if (Math.abs(m.x - app.shown.x) > radius * 1.5 || Math.abs(m.y - app.shown.y) > radius * 1.5) continue;
-      const [x, y] = toScreen(m.x, m.y);
-      const st = markerStyle(m.type);
-      drawMarker(ctx, x, y, st, !m.discovered);
-      if (m.name && st.label <= 1) {
-        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(20,18,15,.85)"; ctx.fillStyle = "#efe6d4";
-        ctx.strokeText(m.name, x, y - st.r - 4); ctx.fillText(m.name, x, y - st.r - 4);
+    strokeTrail(ctx, pts, toScreen, indoors ? "rgba(242,239,232,.8)" : "rgba(120,20,10,.9)", indoors ? 3 : 2.5);
+    if (!indoors) {
+      for (const m of visible()) {
+        if (Math.abs(m.x - app.shown.x) > radius * 1.5 || Math.abs(m.y - app.shown.y) > radius * 1.5) continue;
+        const [x, y] = toScreen(m.x, m.y); drawMarker(ctx, x, y, m, 22);
       }
     }
     ctx.restore();
-
-    // north indicator
-    const rr = Math.min(w, h) / 2 - 14;
-    ctx.fillStyle = "#c9a45c"; ctx.font = "bold 12px Segoe UI, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("N", w / 2 + Math.sin(rot) * rr, h / 2 - Math.cos(rot) * rr);
-    ctx.textBaseline = "alphabetic";
-
-    ctx.strokeStyle = "#3a3226"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(w / 2, h / 2, Math.min(w, h) / 2 - 2, 0, Math.PI * 2); ctx.stroke();
-    drawArrow(ctx, w / 2, h / 2, app.settings.rotate ? 0 : app.shown.h, 9, "#f3d58a");
-    $("miniInfo").textContent = Math.round(radius / 70) + " m radius";
+    ring(ctx, w, h, R);
+    ctx.fillStyle = "#d8c08a"; ctx.font = "14px " + getComputedStyle(document.body).fontFamily; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("N", w / 2 + Math.sin(rot) * (R - 12), h / 2 - Math.cos(rot) * (R - 12)); ctx.textBaseline = "alphabetic";
+    drawPlayer(ctx, w / 2, h / 2, 0, 10);
+    $("miniTitle").textContent = indoors ? (s.where.cell || "Interior") + " · your path" : "";
+    $("miniInfo").textContent = Math.round(radius / 70) + " m";
   }
+  function ring(ctx, w, h, R) { ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(w / 2, h / 2, R, 0, Math.PI * 2); ctx.stroke(); }
 
-  function centerText(ctx, w, h, text) {
-    ctx.fillStyle = "#a39782"; ctx.font = "13px Segoe UI, sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(text, w / 2, h / 2);
-  }
-
-  // ---------- local map ----------
-  const local = $("localMap"), lctx = local.getContext("2d");
-  function drawLocal() {
-    const w = local.clientWidth, h = local.clientHeight, ctx = lctx;
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--map-bg");
-    ctx.fillRect(0, 0, w, h);
-    const s = app.state;
-    if (!s || !app.shown) { centerText(ctx, w, h, "No player yet"); $("localInfo").textContent = ""; return; }
-    const pts = (app.trail[trailKey(s)] || []).filter(Boolean);
-    $("localInfo").textContent = s.where.interior ? (s.where.cell || "Interior") : "Outdoors, 500 m around you";
-
-    let minX, maxX, minY, maxY;
-    if (s.where.interior) {
-      // Fit to everywhere you've walked in this interior.
-      minX = maxX = app.shown.x; minY = maxY = app.shown.y;
-      for (const p of pts) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
-      const pad = 400;
-      minX -= pad; maxX += pad; minY -= pad; maxY += pad;
-    } else {
-      const r = 35000;
-      minX = app.shown.x - r; maxX = app.shown.x + r; minY = app.shown.y - r * h / w; maxY = app.shown.y + r * h / w;
+  // ---------- compass ----------
+  function drawCompass(h) {
+    const strip = $("compassStrip"), wPx = strip.parentNode.clientWidth, pxPerDeg = 3.2;
+    let html = "";
+    const names = { 0: "N", 45: "NE", 90: "E", 135: "SE", 180: "S", 225: "SW", 270: "W", 315: "NW" };
+    for (let d = -360; d <= 720; d += 15) {
+      const off = (d - h) * pxPerDeg + wPx / 2;
+      if (off < -20 || off > wPx + 20) continue;
+      const n = ((d % 360) + 360) % 360;
+      html += `<span class="tick ${names[n] ? "card" : ""}" style="left:${off}px">${names[n] || "·"}</span>`;
     }
-    const scale = Math.min(w / (maxX - minX), h / (maxY - minY));
-    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-    const toScreen = (x, y) => [(x - cx) * scale + w / 2, -(y - cy) * scale + h / 2];
-
-    // light grid (one square = ~5 m indoors)
-    ctx.strokeStyle = "rgba(233,224,207,.05)"; ctx.lineWidth = 1;
-    const step = s.where.interior ? 350 : 4096;
-    for (let x = Math.floor(minX / step) * step; x <= maxX; x += step) { const [sx] = toScreen(x, 0); ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke(); }
-    for (let y = Math.floor(minY / step) * step; y <= maxY; y += step) { const [, sy] = toScreen(0, y); ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke(); }
-
-    if (!s.where.interior) {
-      for (const m of visibleMarkers()) {
-        if (m.x < minX || m.x > maxX || m.y < minY || m.y > maxY) continue;
-        const [x, y] = toScreen(m.x, m.y);
-        drawMarker(ctx, x, y, markerStyle(m.type), !m.discovered);
-      }
-    }
-    strokeTrail(ctx, app.trail[trailKey(s)], toScreen, "rgba(201,164,92,.9)", s.where.interior ? 3 : 2);
-    const [px, py] = toScreen(app.shown.x, app.shown.y);
-    drawArrow(ctx, px, py, app.shown.h, 8, "#f3d58a");
+    strip.style.width = wPx + "px"; strip.innerHTML = html;
   }
 
-  // ---------- side panels ----------
+  // ---------- panels ----------
+  const fmtTime = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}h ${m}m` : m ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`; };
+  const ordinal = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
   function setBar(prefix, v) {
-    const pct = v.max > 0 ? clamp(v.cur / v.max, 0, 1) * 100 : 0;
+    const pct = v && v.max > 0 ? clamp(v.cur / v.max, 0, 1) * 100 : 0;
     $(prefix + "Fill").style.width = pct + "%";
-    $(prefix + "Text").textContent = Math.round(v.cur) + " / " + Math.round(v.max);
+    $(prefix + "Text").textContent = v ? `${Math.round(v.cur)} / ${Math.round(v.max)}` : "—";
   }
-  function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
-  function compass(deg) { return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8]; }
+  const SPELLTYPE = { 0: "Spell", 1: "Disease", 2: "Power", 3: "Lesser power", 4: "Ability", 5: "Poison", 6: "Enchantment", 7: "Potion", 8: "Ingredient", 10: "Addiction", 11: "Shout", 12: "Staff", 13: "Scroll" };
+  function effectSource(e) {
+    const kind = SPELLTYPE[e.spellType] || "";
+    const parts = [];
+    if (e.spellType === 6 && e.item) parts.push(e.item);
+    else if (e.spell && e.spell !== e.name) parts.push(e.spell);
+    else if (e.item) parts.push(e.item);
+    let txt = kind ? kind + (parts.length ? ": " + parts.join(", ") : "") : parts.join(", ");
+    if (e.caster && e.caster !== "You") txt += (txt ? " · " : "") + "from " + e.caster;
+    return txt;
+  }
+  function fillDesc(e) {
+    if (!e.desc) return "";
+    return e.desc.replace(/<mag>/gi, Math.round(e.mag)).replace(/<dur>/gi, Math.round(e.dur)).replace(/<[^>]+>/g, "");
+  }
+  function renderEffects(list) {
+    const el = $("effects");
+    const shown = (list || []).filter(e => (app.settings.hidden || !e.hidden) && e.name);
+    if (!shown.length) { el.innerHTML = `<div class="empty">No active effects</div>`; return; }
+    // Harmful first, then soonest to expire, then constant effects.
+    shown.sort((a, b) => (b.detrimental - a.detrimental) || ((a.dur > 0 ? a.dur - a.elapsed : 1e9) - (b.dur > 0 ? b.dur - b.elapsed : 1e9)) || a.name.localeCompare(b.name));
+    el.innerHTML = shown.map(e => {
+      const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed, pct = timed ? clamp(left / e.dur, 0, 1) * 100 : 100;
+      const desc = fillDesc(e);
+      return `<div class="row ${e.detrimental ? "bad" : ""} ${e.inactive ? "inactive" : ""}">
+        ${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
+        <div style="min-width:0"><div class="name">${esc(e.name)}</div><div class="sub">${esc(effectSource(e))}</div>${timed ? `<div class="tbar"><i style="width:${pct}%"></i></div>` : ""}</div>
+        <div class="right">${timed ? fmtTime(left) : '<span class="dim">—</span>'}${e.mag ? `<div class="sub">${Math.round(e.mag)}</div>` : ""}</div>
+        ${desc ? `<div class="desc">${esc(desc)}</div>` : ""}
+      </div>`;
+    }).join("");
+  }
 
-  function updatePanels(s) {
+  const HUNGER = ["Well Fed", "Satisfied", "Peckish", "Hungry", "Famished", "Starving"];
+  const COLD = ["Warm", "Comfortable", "Chilly", "Very Cold", "Freezing", "Numb"];
+  const FATIGUE = ["Well Rested", "Rested", "Slightly Tired", "Tired", "Weary", "Debilitated"];
+  function stageFrom(n) {
+    if (n.stage >= 0) return Math.round(n.stage);
+    let st = 0; (n.thresholds || []).forEach((t, i) => { if (t > 0 && n.value >= t) st = i + 1; }); return st;
+  }
+  function renderSurvival(sv) {
+    const el = $("survival");
+    if (!sv || sv.enabled === 0 || !(sv.hunger || sv.cold || sv.fatigue)) {
+      el.innerHTML = `<div class="empty">${sv && sv.enabled === 0 ? "Survival Mode is off" : "Survival Mode not detected"}</div>`; $("ambient").textContent = ""; return;
+    }
+    const rows = [["hunger", HUNGER, "var(--hunger)"], ["cold", COLD, "var(--cold)"], ["fatigue", FATIGUE, "var(--fatigue)"]];
+    el.innerHTML = rows.filter(([k]) => sv[k]).map(([k, names, color]) => {
+      const n = sv[k], max = n.max > 0 ? n.max : 1000, pct = clamp(n.value / max, 0, 1) * 100, st = stageFrom(n);
+      const ticks = (n.thresholds || []).filter(t => t > 0 && t < max).map(t => `<i style="left:${t / max * 100}%"></i>`).join("");
+      return `<div class="bar"><div class="bar-top"><span>${esc(n.name)}</span><b class="stage" style="color:${st >= 3 ? "var(--bad)" : "var(--ink)"}">${esc(names[st] || "")}</b></div>
+        <div class="track"><div class="fill" style="width:${pct}%;background:${color}"></div><div class="ticks">${ticks}</div></div></div>`;
+    }).join("");
+    $("ambient").textContent = sv.ambientCold >= 0 ? "Area cold " + Math.round(sv.ambientCold) : "";
+  }
+
+  const SLOT_ORDER = ["head", "body", "hands", "forearms", "feet", "calves", "shield", "amulet", "ring"];
+  const SLOT_NAME = { head: "Head", body: "Body", hands: "Hands", forearms: "Forearms", feet: "Feet", calves: "Calves", shield: "Shield", amulet: "Neck", ring: "Ring" };
+  function renderEquipment(eq) {
+    if (!eq) return;
+    $("armorRating").textContent = Math.round(eq.armorRating ?? 0);
+    const r = eq.resists || {};
+    $("resists").innerHTML = [["Fire", r.fire], ["Frost", r.frost], ["Shock", r.shock], ["Magic", r.magic], ["Poison", r.poison], ["Disease", r.disease]]
+      .map(([n, v]) => `<span>${n}<b>${Math.round(v || 0)}%</b></span>`).join("");
+    if (eq.carry) { setBar("carry", eq.carry); $("carryFill").style.background = eq.carry.cur > eq.carry.max ? "var(--bad)" : "var(--gold)"; }
+
+    const rows = [];
+    const hand = (h, label) => {
+      if (!h) return;
+      let ico, sub = label;
+      if (h.kind === "weapon") { ico = iconHtml("items/" + (WEAPON_ICON[h.weaponType] || "default_weapon") + ".png"); if (h.damage) sub += ` · ${h.damage} dmg`; }
+      else if (h.kind === "spell") { const e = (h.effects || [])[0]; ico = iconHtml("effects/" + (e ? effectIcon(e).base : "default_effect") + ".png"); sub += " · spell"; }
+      else if (h.kind === "shield") { ico = iconHtml("items/armor_shield.png"); sub += ` · ${Math.round(h.armor)} armor`; }
+      else ico = iconHtml("items/default_misc.png");
+      if (h.enchant) sub += " · " + h.enchant;
+      const charge = typeof h.charge === "number" ? `<div class="sub">${Math.round(h.charge)}%</div>` : "";
+      rows.push(`<div class="row">${ico}<div style="min-width:0"><div class="name">${esc(h.name)}</div><div class="sub">${esc(sub)}</div></div><div class="right">${charge}</div></div>`);
+    };
+    hand(eq.right, "Right hand"); hand(eq.left, "Left hand");
+    if (eq.ammo) rows.push(`<div class="row">${iconHtml("items/" + (eq.ammo.bolt ? "weapon_bolt" : "weapon_arrow") + ".png")}<div style="min-width:0"><div class="name">${esc(eq.ammo.name)}</div><div class="sub">Ammo</div></div><div class="right count ${eq.ammo.count < 10 ? "low" : ""}">${eq.ammo.count}</div></div>`);
+    if (eq.power) rows.push(`<div class="row">${iconHtml("effects/" + (eq.power.shout ? "av_skill_shout" : "default_effect") + ".png")}<div style="min-width:0"><div class="name">${esc(eq.power.name)}</div><div class="sub">${eq.power.shout ? "Shout" : "Power"}</div></div><div class="right"></div></div>`);
+    const worn = (eq.worn || []).slice().sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
+    for (const a of worn) {
+      const sub = SLOT_NAME[a.slot] + (a.weight !== "clothing" && a.weight !== "jewelry" ? " · " + a.weight : "") + (a.enchant ? " · " + a.enchant : "");
+      rows.push(`<div class="row">${iconHtml("items/" + armorIcon(a.slot, a.weight) + ".png")}<div style="min-width:0"><div class="name">${esc(a.name)}</div><div class="sub">${esc(sub)}</div></div><div class="right">${a.armor ? Math.round(a.armor) : ""}</div></div>`);
+    }
+    $("equipment").innerHTML = rows.length ? rows.join("") : `<div class="empty">Nothing equipped</div>`;
+  }
+
+  function mainEffect(p) {
+    let best = null;
+    for (const e of p.effects || []) if (!best || e.mag * Math.max(1, e.dur) > best.mag * Math.max(1, best.dur)) best = e;
+    return best;
+  }
+  function consGroup(p) {
+    if (p.kind === "poison") return "Poisons";
+    if (p.kind === "food") return "Food & Drink";
+    const e = mainEffect(p);
+    if (!e) return "Other potions";
+    if (e.archetype === 3 || e.archetype === 29) return "Cures";
+    if (!e.detrimental && !e.recover) {
+      if (e.av === 24) return "Restore Health";
+      if (e.av === 25) return "Restore Magicka";
+      if (e.av === 26) return "Restore Stamina";
+    }
+    if ([27, 28, 29, 155, 156, 157].includes(e.av)) return "Regeneration";
+    if (e.av >= 40 && e.av <= 45) return "Resistances";
+    if (e.recover) return "Fortify";
+    return "Other potions";
+  }
+  const GROUP_ORDER = ["Restore Health", "Restore Magicka", "Restore Stamina", "Regeneration", "Cures", "Resistances", "Fortify", "Other potions", "Food & Drink", "Poisons"];
+  function renderConsumables(list) {
+    const el = $("consumables");
+    if (!list || !list.length) { el.innerHTML = `<div class="empty">No potions, food or poisons</div>`; $("consTotal").textContent = ""; return; }
+    const groups = new Map();
+    for (const p of list) { const g = consGroup(p); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p); }
+    let html = "", total = 0;
+    for (const g of GROUP_ORDER) {
+      const items = groups.get(g); if (!items) continue;
+      const sum = items.reduce((a, b) => a + b.count, 0); total += sum;
+      items.sort((a, b) => (mainEffect(b)?.mag || 0) - (mainEffect(a)?.mag || 0) || b.count - a.count);
+      html += `<div class="group-h">${esc(g)} · ${sum}</div>`;
+      html += items.map(p => {
+        const e = mainEffect(p);
+        const sub = e ? `${e.name}${e.mag ? " " + Math.round(e.mag) : ""}${e.dur ? " for " + e.dur + "s" : ""}` + ((p.effects || []).length > 1 ? ` +${p.effects.length - 1}` : "") : "";
+        return `<div class="row">${iconHtml("items/" + potionIcon(p) + ".png")}<div style="min-width:0"><div class="name">${esc(p.name)}</div><div class="sub">${esc(sub)}</div></div><div class="right count ${p.count <= 2 && g.startsWith("Restore") ? "low" : ""}">${p.count}</div></div>`;
+      }).join("");
+    }
+    el.innerHTML = html; $("consTotal").textContent = total + " total";
+  }
+
+  let lastSlow = 0;
+  function renderPanels(s) {
     const p = s.player;
     setBar("hp", s.stats.health); setBar("mp", s.stats.magicka); setBar("sp", s.stats.stamina);
     $("charLevel").textContent = (p.name ? p.name + " · " : "") + "Level " + p.level;
     $("chipCombat").className = "chip" + (p.inCombat ? " on danger" : "");
     $("chipSneak").className = "chip" + (p.sneaking ? " on" : "");
     $("chipMount").className = "chip" + (p.mounted ? " on" : "");
-
+    $("gold").textContent = p.gold.toLocaleString() + " gold";
     if (s.time) {
       const hr = s.time.hour, H = Math.floor(hr), M = Math.floor((hr - H) * 60);
-      $("rTime").textContent = ((H + 11) % 12 + 1) + ":" + String(M).padStart(2, "0") + (H < 12 ? " AM" : " PM");
-      $("rDate").textContent = `${s.time.dayName}, ${ordinal(s.time.day)} of ${s.time.month}, 4E ${s.time.year}`;
+      $("clockT").textContent = ((H + 11) % 12 + 1) + ":" + String(M).padStart(2, "0") + (H < 12 ? " AM" : " PM");
+      $("clockD").textContent = `${s.time.dayName}, ${ordinal(s.time.day)} of ${s.time.month}, 4E ${s.time.year}`;
     }
-    $("rHeading").textContent = Math.round(p.heading) + "° " + compass(p.heading);
-    $("rGold").textContent = p.gold.toLocaleString();
-    $("rPos").textContent = s.where.interior ? "indoors" : `${Math.round(p.x / 4096)}, ${Math.round(p.y / 4096)} (cell)`;
-
-    const total = app.markers.length, disc = app.markers.filter(m => m.discovered).length;
-    $("rDisc").textContent = total ? `${disc} of ${total}` : "—";
-
-    let near = null, nd = Infinity;
-    if (!s.where.interior) for (const m of app.markers) {
-      if (!(m.discovered || m.seen || app.settings.spoilers)) continue;
-      const d = Math.hypot(m.x - p.x, m.y - p.y);
-      if (d < nd) { nd = d; near = m; }
-    }
-    $("rNearest").textContent = near ? `${near.name} · ${Math.round(nd / 70)} m ${compass((Math.atan2(near.x - p.x, near.y - p.y) * 180 / Math.PI + 360) % 360)}` : "—";
-
-    const where = s.where;
-    $("whereBig").textContent = where.interior ? (where.cell || "Interior") : (where.location || where.worldspace || "Wilderness");
-    $("whereSmall").textContent = where.interior ? (where.location || "") : (where.worldspace || "");
+    const wh = s.where;
+    $("whereBig").textContent = wh.interior ? (wh.cell || "Interior") : (wh.location || wh.worldspace || "Wilderness");
+    $("whereSmall").textContent = wh.interior ? (wh.location || "") : (wh.worldspace || "");
+    renderEffects(s.effects);
+    renderSurvival(s.survival);
+    // Inventory-based panels change slowly; don't rebuild them on every update.
+    if (Date.now() - lastSlow > 900) { lastSlow = Date.now(); renderEquipment(s.equipment); renderConsumables(s.consumables); }
   }
+  $("setHidden").checked = !!app.settings.hidden;
+  $("setHidden").onchange = () => { app.settings.hidden = $("setHidden").checked; store.set("settings", app.settings); if (app.state) renderEffects(app.state.effects); };
 
-  // ---------- settings ----------
-  function bindSetting(id, key, kind) {
-    const el = $(id);
-    if (kind === "check") el.checked = !!app.settings[key]; else el.value = app.settings[key];
-    el.addEventListener("input", () => {
-      app.settings[key] = kind === "check" ? el.checked : Number(el.value);
-      store.set("settings", app.settings);
-    });
-  }
-  bindSetting("setRotate", "rotate", "check");
-  bindSetting("setMiniZoom", "miniZoom", "range");
-  bindSetting("setSpoilers", "spoilers", "check");
-  bindSetting("setLabels", "labels", "check");
-
-  // ---------- demo mode (no game needed) ----------
+  // ---------- demo ----------
   function startDemo() {
-    app.demo = true;
-    $("banner").style.display = "none";
-    const types = [1, 1, 2, 2, 2, 3, 4, 4, 6, 7, 7, 8, 11, 13, 15, 21, 25, 34];
-    let seed = 7;
-    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    app.demo = true; $("banner").style.display = "none";
+    let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const types = [1, 2, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 15, 17, 20, 21, 25, 27, 28, 29];
     const markers = [];
-    for (let i = 0; i < 70; i++) {
-      const t = types[Math.floor(rnd() * types.length)];
-      markers.push({ name: (CITY.has(t) ? "Demo City " : TOWN.has(t) ? "Demo Town " : "Demo Site ") + (i + 1),
-        x: (rnd() - 0.5) * 220000, y: (rnd() - 0.5) * 160000, type: t, seen: rnd() > 0.2, discovered: rnd() > 0.45 });
-    }
-    app.worldspace = -1; app.markers = [];
-    onMarkers({ worldspace: 60, markers });
-    let t = 0, hp = 1;
+    for (let i = 0; i < 120; i++) { const t = types[Math.floor(rnd() * types.length)]; markers.push({ ref: "", name: "Demo place " + (i + 1), x: (rnd() - 0.45) * 380000, y: (rnd() - 0.5) * 200000 - 10000, type: t, seen: rnd() > 0.15, discovered: rnd() > 0.4 }); }
+    onMarkers({ markers });
+    let t = 0;
     setInterval(() => {
-      t += 0.0025;
-      const x = Math.cos(t) * 60000 + Math.cos(t * 3.1) * 8000;
-      const y = Math.sin(t) * 40000 + Math.sin(t * 2.3) * 6000;
-      const dx = -Math.sin(t) * 60000 - Math.sin(t * 3.1) * 3.1 * 8000;
-      const dy = Math.cos(t) * 40000 + Math.cos(t * 2.3) * 2.3 * 6000;
-      const heading = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
-      hp = 0.6 + 0.4 * Math.abs(Math.sin(t * 7));
-      const indoors = Math.sin(t * 2) > 0.92;
+      t += 0.002;
+      const x = Math.cos(t) * 70000 + 10000, y = Math.sin(t) * 40000 + 5000;
+      const heading = (Math.atan2(-Math.sin(t) * 70000, Math.cos(t) * 40000) * 180 / Math.PI + 360) % 360;
       onState({
         ready: true,
-        player: { name: "Demo", level: 23, x, y, z: 0, heading, gold: 1873, inCombat: Math.sin(t * 9) > 0.8, sneaking: Math.sin(t * 5) > 0.7, mounted: false },
-        stats: { health: { cur: 410 * hp, max: 410 }, magicka: { cur: 260, max: 330 }, stamina: { cur: 180, max: 240 } },
-        where: { worldspaceId: 60, worldspace: "Demo World", cell: indoors ? "Demo Cave" : "", interior: indoors, location: indoors ? "Demo Cave" : "Demo Hold" },
-        time: { hour: (8 + t * 60) % 24, day: 17, dayName: "Morndas", month: "Last Seed", year: 201 }
+        player: { name: "Demo", level: 31, x, y, z: 0, heading, gold: 4210, inCombat: Math.sin(t * 9) > 0.85, sneaking: Math.sin(t * 5) > 0.6, mounted: false },
+        stats: { health: { cur: 380 + 60 * Math.sin(t * 20), max: 440 }, magicka: { cur: 290, max: 360 }, stamina: { cur: 150, max: 240 } },
+        where: { worldspaceId: 60, worldspace: "Skyrim", worldspaceEdid: "Tamriel", cell: "", interior: false, location: "Whiterun Hold" },
+        time: { hour: (9 + t * 40) % 24, day: 17, dayName: "Morndas", month: "Last Seed", year: 201 },
+        effects: [
+          { name: "Fortify Destruction", desc: "Destruction spells are <mag>% stronger for <dur> seconds.", spell: "Potion of the Warlock", spellType: 7, item: "", caster: "You", mag: 25, dur: 60, elapsed: (t * 900) % 60, archetype: 0, av: 20, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
+          { name: "Fortify Health", desc: "Health is increased by <mag> points.", spell: "Ring of Health", spellType: 6, item: "Ring of Health", caster: "You", mag: 40, dur: 0, elapsed: 0, archetype: 0, av: 24, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
+          { name: "Frostbite", desc: "", spell: "Frostbite", spellType: 0, item: "", caster: "Ice Wraith", mag: 8, dur: 5, elapsed: (t * 900) % 5, archetype: 0, av: 24, resist: 43, detrimental: true, recover: false, hidden: false, inactive: false },
+          { name: "Oakflesh", desc: "Improves the caster's armor rating by <mag> points for <dur> seconds.", spell: "Oakflesh", spellType: 0, item: "", caster: "You", mag: 40, dur: 60, elapsed: (t * 400) % 60, archetype: 0, av: 39, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
+          { name: "Breton Magic Resistance", desc: "", spell: "Magic Resistance", spellType: 4, item: "", caster: "You", mag: 25, dur: 0, elapsed: 0, archetype: 0, av: 44, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false }
+        ],
+        survival: { enabled: 1, ambientCold: 120, hunger: { name: "Hunger", value: (t * 3000) % 600, max: 600, stage: -1, thresholds: [60, 160, 240, 360, 480] }, cold: { name: "Cold", value: 210, max: 1000, stage: -1, thresholds: [100, 200, 400, 600, 800] }, fatigue: { name: "Fatigue", value: 130, max: 600, stage: -1, thresholds: [60, 120, 240, 360, 480] } },
+        equipment: {
+          right: { name: "Staff of Firebolts", kind: "weapon", weaponType: 8, damage: 0, enchant: "Firebolt", charge: 72 },
+          left: { name: "Fast Healing", kind: "spell", effects: [{ name: "Restore Health", archetype: 0, av: 24, detrimental: false, recover: false }] },
+          ammo: { name: "Iron Arrow", count: 7, bolt: false }, power: { name: "Unrelenting Force", shout: true },
+          worn: [{ slot: "head", name: "Hooded Mage Robes Cowl", armor: 0, weight: "clothing", enchant: "Fortify Magicka" }, { slot: "body", name: "Robes of Destruction", armor: 0, weight: "clothing", enchant: "Fortify Destruction" },
+            { slot: "hands", name: "Elven Gauntlets", armor: 9, weight: "light", enchant: "" }, { slot: "feet", name: "Elven Boots", armor: 9, weight: "light", enchant: "" },
+            { slot: "amulet", name: "Amulet of Julianos", armor: 0, weight: "jewelry", enchant: "Fortify Magicka" }, { slot: "ring", name: "Ring of Health", armor: 0, weight: "jewelry", enchant: "Fortify Health" }],
+          armorRating: 104, carry: { cur: 212, max: 300 }, resists: { fire: 0, frost: 15, shock: 0, magic: 25, poison: 0, disease: 0 }
+        },
+        consumables: [
+          { name: "Potion of Plentiful Healing", count: 6, kind: "potion", effects: [{ name: "Restore Health", mag: 100, dur: 0, av: 24, archetype: 0, detrimental: false, recover: false }] },
+          { name: "Potion of Minor Healing", count: 2, kind: "potion", effects: [{ name: "Restore Health", mag: 25, dur: 0, av: 24, archetype: 0, detrimental: false, recover: false }] },
+          { name: "Potion of Extreme Magicka", count: 3, kind: "potion", effects: [{ name: "Restore Magicka", mag: 150, dur: 0, av: 25, archetype: 0, detrimental: false, recover: false }] },
+          { name: "Draught of Vigorous Stamina", count: 1, kind: "potion", effects: [{ name: "Restore Stamina", mag: 75, dur: 0, av: 26, archetype: 0, detrimental: false, recover: false }] },
+          { name: "Potion of Cure Disease", count: 1, kind: "potion", effects: [{ name: "Cure Disease", mag: 0, dur: 0, av: -1, archetype: 3, detrimental: false, recover: false }] },
+          { name: "Venison Stew", count: 4, kind: "food", effects: [{ name: "Restore Stamina", mag: 15, dur: 720, av: 157, archetype: 0, detrimental: false, recover: true }] },
+          { name: "Deadly Poison", count: 3, kind: "poison", effects: [{ name: "Damage Health", mag: 45, dur: 0, av: 24, archetype: 0, detrimental: true, recover: false }] }
+        ]
       });
     }, 150);
   }
 
-  // ---------- render loop ----------
-  function resizeCanvas(c) {
-    const dpr = window.devicePixelRatio || 1;
-    const w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
+  // ---------- frame loop ----------
+  function fitCanvas(c) {
+    const dpr = window.devicePixelRatio || 1, w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     c.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-
   function frame() {
     if (app.state && app.shown) {
-      // Glide toward the latest position so the arrow moves smoothly between updates.
       const p = app.state.player;
-      app.shown.x += (p.x - app.shown.x) * 0.25;
-      app.shown.y += (p.y - app.shown.y) * 0.25;
-      let dh = ((p.heading - app.shown.h + 540) % 360) - 180;
-      app.shown.h = (app.shown.h + dh * 0.3 + 360) % 360;
+      app.shown.x += (p.x - app.shown.x) * 0.25; app.shown.y += (p.y - app.shown.y) * 0.25;
+      const dh = ((p.heading - app.shown.h + 540) % 360) - 180; app.shown.h = (app.shown.h + dh * 0.3 + 360) % 360;
+      drawCompass(app.shown.h);
     }
-    for (const c of [world, mini, local]) resizeCanvas(c);
-    drawWorld(); drawMini(); drawLocal();
+    fitCanvas(world); fitCanvas(mini);
+    drawWorld(); drawMini();
     requestAnimationFrame(frame);
   }
 
-  if (new URLSearchParams(location.search).has("demo")) startDemo();
-  else {
-    setInterval(pollState, 150);
-    setInterval(pollMarkers, 5000);
-    pollState(); pollMarkers();
-  }
-  requestAnimationFrame(frame);
+  (async () => {
+    const demo = new URLSearchParams(location.search).has("demo");
+    if (demo) app.demo = true;
+    await loadStatic();
+    if (demo) startDemo();
+    else { setInterval(pollState, 150); setInterval(pollMarkers, 5000); pollState(); pollMarkers(); }
+    requestAnimationFrame(frame);
+  })();
 })();
 </script>
 </body>
