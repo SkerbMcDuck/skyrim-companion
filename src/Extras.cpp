@@ -64,6 +64,14 @@ namespace companion::extras
 			return 0;
 		}
 
+		// Same game function Survival Mode Improved calls for the warmth rating (Address Library IDs SE 25834 / AE 26394).
+		float GetWarmthRating(RE::Actor* a_actor)
+		{
+			using func_t = float(RE::Actor*);
+			static REL::Relocation<func_t> func{ RELOCATION_ID(25834, 26394) };
+			return func(a_actor);
+		}
+
 		const char* ArmorClass(RE::TESObjectARMO* a_armor)
 		{
 			return a_armor->IsHeavyArmor() ? "heavy" : a_armor->IsLightArmor() ? "light" : "clothing";
@@ -129,7 +137,7 @@ namespace companion::extras
 	json Warmth(RE::PlayerCharacter* a_player)
 	{
 		return json{
-			{ "rating", a_player->GetWarmthRating() },
+			{ "rating", GetWarmthRating(a_player) },
 			{ "cap", GlobalValue("Survival_ColdResistMaxValue", 0.0f) },
 			// Survival Mode Improved's UI state: 0 neutral, 1 near heat (warming), 2 warm, 3 cold, 4 freezing.
 			{ "uiLevel", GlobalValue("Survival_TemperatureLevel", -1.0f) },
