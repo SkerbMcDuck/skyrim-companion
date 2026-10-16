@@ -606,22 +606,37 @@
     if (!e.desc) return "";
     return e.desc.replace(/<mag>/gi, Math.round(e.mag)).replace(/<dur>/gi, Math.round(e.dur)).replace(/<[^>]+>/g, "");
   }
+  // The game's own Active Effects menu skips inactive and hidden effects; do the same unless "hidden" is ticked.
+  // Permanent abilities (racial powers, perk and mod helpers) go in a collapsible group so buffs stay on top.
+  let abilitiesOpen = store.get("abilitiesOpen", false);
+  function effectRow(e) {
+    const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed, pct = timed ? clamp(left / e.dur, 0, 1) * 100 : 100;
+    const desc = fillDesc(e);
+    return `<div class="row ${e.detrimental ? "bad" : ""} ${e.inactive ? "inactive" : ""}">
+      ${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
+      <div style="min-width:0"><div class="name">${esc(e.name)}</div><div class="sub">${esc(effectSource(e))}</div>${timed ? `<div class="tbar"><i style="width:${pct}%"></i></div>` : ""}</div>
+      <div class="right">${timed ? fmtTime(left) : '<span class="dim">—</span>'}${e.mag ? `<div class="sub">${Math.round(e.mag)}</div>` : ""}</div>
+      ${desc ? `<div class="desc">${esc(desc)}</div>` : ""}
+    </div>`;
+  }
   function renderEffects(list) {
     const el = $("effects");
-    const shown = (list || []).filter(e => (app.settings.hidden || !e.hidden) && e.name);
-    if (!shown.length) { el.innerHTML = `<div class="empty">No active effects</div>`; return; }
-    // Harmful first, then soonest to expire, then constant effects.
-    shown.sort((a, b) => (b.detrimental - a.detrimental) || ((a.dur > 0 ? a.dur - a.elapsed : 1e9) - (b.dur > 0 ? b.dur - b.elapsed : 1e9)) || a.name.localeCompare(b.name));
-    el.innerHTML = shown.map(e => {
-      const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed, pct = timed ? clamp(left / e.dur, 0, 1) * 100 : 100;
-      const desc = fillDesc(e);
-      return `<div class="row ${e.detrimental ? "bad" : ""} ${e.inactive ? "inactive" : ""}">
-        ${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
-        <div style="min-width:0"><div class="name">${esc(e.name)}</div><div class="sub">${esc(effectSource(e))}</div>${timed ? `<div class="tbar"><i style="width:${pct}%"></i></div>` : ""}</div>
-        <div class="right">${timed ? fmtTime(left) : '<span class="dim">—</span>'}${e.mag ? `<div class="sub">${Math.round(e.mag)}</div>` : ""}</div>
-        ${desc ? `<div class="desc">${esc(desc)}</div>` : ""}
-      </div>`;
-    }).join("");
+    const all = (list || []).filter(e => e.name && (app.settings.hidden || (!e.hidden && !e.inactive)));
+    // Same effect from the same source listed once.
+    const seen = new Set(), shown = [];
+    for (const e of all) { const k = e.name + "|" + e.spell + "|" + e.item; if (!seen.has(k)) { seen.add(k); shown.push(e); } }
+    const isAbility = (e) => e.spellType === 4 && !(e.dur > 1) && !e.detrimental;
+    const main = shown.filter(e => !isAbility(e)), abil = shown.filter(isAbility);
+    main.sort((a, b) => (b.detrimental - a.detrimental) || ((a.dur > 1 ? a.dur - a.elapsed : 1e9) - (b.dur > 1 ? b.dur - b.elapsed : 1e9)) || a.name.localeCompare(b.name));
+    abil.sort((a, b) => a.name.localeCompare(b.name));
+    let html = main.length ? main.map(effectRow).join("") : `<div class="empty">No active effects</div>`;
+    if (abil.length) {
+      html += `<div class="group-h" id="abilToggle" style="cursor:pointer;margin-top:10px">${abilitiesOpen ? "▾" : "▸"} Abilities · ${abil.length}</div>`;
+      if (abilitiesOpen) html += abil.map(effectRow).join("");
+    }
+    el.innerHTML = html;
+    const t = $("abilToggle");
+    if (t) t.onclick = () => { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); renderEffects(list); };
   }
 
   const HUNGER = ["Well Fed", "Satisfied", "Peckish", "Hungry", "Famished", "Starving"];

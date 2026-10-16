@@ -1,6 +1,7 @@
 #include "Server.h"
 
 #include <atomic>
+#include <cctype>
 #include <cstring>
 #include <sstream>
 #include <thread>
@@ -72,6 +73,23 @@ namespace companion::server
 			}
 		}
 
+		// "/assets/markers/CoMAP%201.png" -> "/assets/markers/CoMAP 1.png"
+		std::string UrlDecode(const std::string& a_in)
+		{
+			std::string out;
+			out.reserve(a_in.size());
+			for (std::size_t i = 0; i < a_in.size(); ++i) {
+				const char c = a_in[i];
+				if (c == '%' && i + 2 < a_in.size() && std::isxdigit(static_cast<unsigned char>(a_in[i + 1])) && std::isxdigit(static_cast<unsigned char>(a_in[i + 2]))) {
+					out.push_back(static_cast<char>(std::stoi(a_in.substr(i + 1, 2), nullptr, 16)));
+					i += 2;
+				} else {
+					out.push_back(c);
+				}
+			}
+			return out;
+		}
+
 		void HandleClient(socket_t client)
 		{
 			SetRecvTimeout(client, 2000);
@@ -100,7 +118,7 @@ namespace companion::server
 				res.body = "only GET is supported";
 			} else {
 				const auto q = target.find('?');
-				const std::string path = q == std::string::npos ? target : target.substr(0, q);
+				const std::string path = UrlDecode(q == std::string::npos ? target : target.substr(0, q));
 				try {
 					res = g_handler(path);
 				} catch (...) {
