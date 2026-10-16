@@ -6,244 +6,275 @@
 <title>Skyrim Companion</title>
 <style>
   @font-face { font-family: "Sovngarde"; src: url("assets/fonts/Sovngarde.ttf") format("truetype"); }
+  /* Layout (from the design review): left = opponent, party, mini map in the bottom-left corner (nearest the main screen);
+     center = world map with quest/location header, then crosshair / alerts / calendar; right = character, survival,
+     equipment, effects + supplies. One dark theme matched to SkyUI. */
   :root {
-    --bg: #0b0a09;
-    --panel: rgba(12, 11, 10, 0.86);
-    --panel-solid: #141210;
-    --line: rgba(255, 255, 255, 0.16);
-    --line-strong: rgba(255, 255, 255, 0.32);
-    --ink: #f2efe8;
-    --muted: #a9a398;
-    --dim: #6f6a61;
-    --gold: #d8c08a;
-    --health: #b4291f;
-    --magicka: #2b63c4;
-    --stamina: #3f8f3a;
-    --bad: #d0574c;
-    --good: #8fc27e;
-    --hunger: #c9893b;
-    --cold: #6fb3d9;
-    --fatigue: #9a86c9;
+    --bg: #07090a;
+    --panel: rgba(16, 18, 19, .94);
+    --line: #3a3d3f;
+    --line-soft: #26292b;
+    --fg: #ece8df;
+    --fg-dim: #aaa69d;
+    --fg-mute: #77736b;
+    --health: #c23a26;
+    --magicka: #2f74c6;
+    --stamina: #4f9b3c;
+    --gold: #d8b25a;
+    --bad: #e05040;
+    --good: #84c26e;
+    --frost: #79b8e6;
+    --fire: #ef7a35;
+    --hunger: #c9a35a;
+    --fatigue: #9a8fc4;
     --font: "Sovngarde", "Futura", "Century Gothic", "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.35 var(--font); overflow: hidden; }
-  .app { display: grid; grid-template-columns: 360px 1fr 380px; height: 100vh; }
-  .col { display: flex; flex-direction: column; gap: 6px; padding: 6px; overflow: hidden; min-height: 0; background: var(--panel-solid); }
-  .col::-webkit-scrollbar { width: 6px; } .col::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
-  .center { position: relative; min-width: 0; overflow: hidden; background: #000; }
-  .panel { background: var(--panel); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); padding: 6px 10px 8px;
-    display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px/1.3 var(--font); overflow: hidden; }
+  .app { height: 100%; display: grid; grid-template-rows: auto 1fr; gap: 6px; padding: 6px 8px 8px; }
+  .topbar { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  .brand { letter-spacing: .2em; text-transform: uppercase; font-size: 13px; color: var(--fg-dim); }
+  .conn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-mute); }
+  .cdot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+  .cdot.ok { background: var(--good); } .cdot.wait { background: var(--gold); } .cdot.bad { background: var(--bad); }
+  .tabs { margin-left: auto; display: flex; gap: 2px; }
+  .tabs button, .chipbtn { font: 13px var(--font); letter-spacing: .14em; text-transform: uppercase; background: transparent; color: var(--fg-dim);
+    border: 1px solid transparent; padding: 2px 10px; cursor: pointer; }
+  .tabs button:hover, .chipbtn:hover { color: var(--fg); border-color: var(--line); }
+  .tabs button.on { color: var(--fg); border-bottom-color: var(--fg); }
+  .chipbtn.on { color: var(--fg); border-color: var(--fg-dim); }
+
+  .grid { min-height: 0; display: grid; grid-template-columns: minmax(250px, 22fr) minmax(0, 50fr) minmax(300px, 28fr); gap: 6px; }
+  .col { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .panel { background: var(--panel); border: 1px solid var(--line-soft); min-height: 0; min-width: 0; display: flex; flex-direction: column; flex: 0 0 auto; }
   .panel.grow { flex: 1 1 0; }
-  .panel.grow2 { flex: 2 1 0; }
-  .panel.grow3 { flex: 3 1 0; }
-  .panel .list { flex: 1 1 auto; min-height: 0; overflow: hidden; }
-  .member { padding: 4px 2px 5px; border-bottom: 1px solid rgba(255,255,255,.07); }
-  .member:last-child { border-bottom: 0; }
-  .member .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .member .nm { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .member .st { font-size: 12px; color: var(--muted); white-space: nowrap; }
-  .member .st.bad { color: var(--bad); } .member .st.warn { color: var(--gold); }
-  .member .where { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mbars { display: grid; grid-template-columns: 3fr 1fr 1fr; gap: 3px; margin-top: 3px; }
-  .mbars i { display: block; height: 5px; background: rgba(255,255,255,.08); position: relative; }
-  .mbars i b { position: absolute; inset: 0 auto 0 0; }
-  .member.dead { opacity: .5; }
-  .more { font-size: 12px; color: var(--dim); padding: 3px 2px 0; letter-spacing: .04em; }
-  .sumchips { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); margin: -2px 0 4px; }
-  .sumchips b { color: var(--ink); font-weight: 400; }
-  .sumchips b.low { color: var(--bad); }
-  .keys { position: absolute; bottom: 44px; left: 10px; font-size: 11px; color: var(--muted); background: rgba(0,0,0,.55); padding: 3px 8px; letter-spacing: .03em; }
-  .panel h2 { margin: 0 0 8px; font: 400 13px/1 var(--font); letter-spacing: .18em; text-transform: uppercase; color: var(--gold);
-    display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .panel h2 small { font-size: 11px; letter-spacing: .06em; text-transform: none; color: var(--muted); }
-  .muted { color: var(--muted); } .dim { color: var(--dim); }
-  .empty { color: var(--dim); font-size: 13px; padding: 4px 0; }
+  .ph { display: flex; align-items: baseline; gap: 8px; padding: 5px 10px 4px; border-bottom: 1px solid var(--line-soft); }
+  .ph h2 { margin: 0; font: 400 13px/1 var(--font); letter-spacing: .18em; text-transform: uppercase; color: var(--fg-dim); }
+  .ph .meta { margin-left: auto; font-size: 12px; color: var(--fg-mute); white-space: nowrap; }
+  .pb { padding: 5px 10px 7px; min-height: 0; overflow: hidden; flex: 1 1 auto; display: flex; flex-direction: column; }
+  .list { min-height: 0; overflow: hidden; flex: 1 1 auto; }
+  .num { font-variant-numeric: tabular-nums; }
+  .dim { color: var(--fg-dim); } .mute { color: var(--fg-mute); } .red { color: var(--bad); } .goldc { color: var(--gold); } .goodc { color: var(--good); }
+  .empty { color: var(--fg-mute); font-size: 13px; padding: 2px 0; }
+  .soon { color: var(--fg-mute); font-size: 12px; letter-spacing: .04em; }
+  .key { display: inline-block; min-width: 16px; padding: 0 4px; border: 1px solid var(--fg-mute); border-radius: 2px; font-size: 11px; line-height: 15px;
+    text-align: center; color: var(--fg-dim); }
+  .rule { border-top: 1px solid var(--line-soft); margin: 5px 0; }
+  .bar { height: 5px; background: #222527; position: relative; overflow: hidden; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; display: block; }
+  .bar .tk { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,.85); }
+  .grp { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-mute); margin: 6px 0 2px; }
+  .grp:first-child { margin-top: 0; }
+  .more { font-size: 12px; color: var(--fg-mute); padding-top: 2px; }
 
-  /* world map */
-  #worldMap { display: block; width: 100%; height: 100%; cursor: grab; }
-  #worldMap.dragging { cursor: grabbing; }
-  .hud-top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 10px 14px; background: linear-gradient(rgba(0,0,0,.75), rgba(0,0,0,0)); pointer-events: none; }
-  .loc-big { font-size: 22px; letter-spacing: .06em; text-shadow: 0 1px 3px #000; }
-  .loc-small { font-size: 13px; color: var(--muted); text-shadow: 0 1px 2px #000; }
-  .clock { text-align: right; }
-  .clock .t { font-size: 22px; letter-spacing: .04em; text-shadow: 0 1px 3px #000; }
-  .clock .d { font-size: 13px; color: var(--muted); }
-  .compass { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); width: 420px; max-width: 70%; height: 26px;
-    overflow: hidden; border-bottom: 1px solid var(--line-strong); background: rgba(0,0,0,.45); pointer-events: none; }
-  .compass .strip { position: absolute; top: 0; height: 100%; white-space: nowrap; font-size: 13px; }
-  .compass .tick { position: absolute; top: 5px; transform: translateX(-50%); color: var(--muted); }
-  .compass .tick.card { color: var(--ink); }
-  .compass .needle { position: absolute; left: 50%; top: 0; width: 2px; height: 100%; background: var(--gold); }
-  .toolbar { position: absolute; bottom: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
-  .status { position: absolute; bottom: 12px; right: 12px; display: flex; gap: 8px; align-items: center; font-size: 12px;
-    background: rgba(0,0,0,.6); border: 1px solid var(--line); padding: 4px 10px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
-  .dot.ok { background: var(--good); } .dot.wait { background: var(--gold); } .dot.bad { background: var(--bad); }
-  button { font: 13px var(--font); letter-spacing: .05em; color: var(--ink); background: rgba(0,0,0,.65); border: 1px solid var(--line-strong);
-    padding: 5px 10px; cursor: pointer; }
-  button:hover { border-color: var(--gold); }
-  button.active { border-color: var(--gold); color: var(--gold); }
-  .tooltip { position: absolute; pointer-events: none; background: rgba(0,0,0,.88); border: 1px solid var(--line-strong);
-    padding: 3px 8px; font-size: 13px; display: none; white-space: nowrap; }
-  .banner { position: absolute; left: 50%; top: 110px; transform: translateX(-50%); background: rgba(0,0,0,.9);
-    border: 1px solid var(--gold); padding: 12px 16px; max-width: 520px; display: none; text-align: center; }
+  /* party */
+  .pcard { padding: 4px 0; border-bottom: 1px solid var(--line-soft); }
+  .pcard:last-child { border-bottom: 0; }
+  .pcard .top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  .pdot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+  .pname { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pst { margin-left: auto; font-size: 12px; color: var(--fg-dim); white-space: nowrap; }
+  .pst.bad { color: var(--bad); } .pst.warn { color: var(--gold); }
+  .mbars { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3px; margin: 3px 0 2px; }
+  .pline { font-size: 12px; color: var(--fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pcard.dead { opacity: .55; }
+  .minipanel { flex: none; display: flex; justify-content: center; padding: 4px; }
+  #miniMap { display: block; width: 100%; max-width: 300px; aspect-ratio: 1 / 1; height: auto; }
+
+  /* center */
+  .mapp { flex: 1 1 auto; }
+  .maphead { display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline; padding: 5px 10px; border-bottom: 1px solid var(--line-soft); }
+  .loc { font-size: 20px; letter-spacing: .06em; }
+  .loc2 { font-size: 13px; color: var(--fg-dim); }
+  .when { margin-left: auto; font-size: 13px; color: var(--fg-dim); text-align: right; }
+  .mapview { position: relative; flex: 1 1 auto; min-height: 200px; background: #000; }
+  #worldMap { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+  .mapctl { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; }
+  .mapctl .chipbtn { background: rgba(8,10,11,.8); }
+  .tooltip { position: absolute; pointer-events: none; background: rgba(0,0,0,.88); border: 1px solid var(--line); padding: 2px 8px; font-size: 13px; display: none; white-space: nowrap; }
+  .banner { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); background: rgba(0,0,0,.92); border: 1px solid var(--gold);
+    padding: 12px 16px; max-width: 520px; display: none; text-align: center; }
   .banner p { margin: 0 0 10px; }
+  .lowrow { display: grid; grid-template-columns: 1.1fr 1fr .9fr; gap: 6px; flex: 0 0 210px; min-height: 0; }
+  .alerts.flash { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(216,178,90,.35); }
+  .ev { display: flex; gap: 8px; font-size: 13px; padding: 1px 0; }
+  .ev .t { color: var(--fg-mute); font-size: 11px; min-width: 52px; padding-top: 2px; }
+  .ev.urgent { color: var(--bad); }
+  .cal table { border-collapse: collapse; width: 100%; font-size: 11px; text-align: center; }
+  .cal th { color: var(--fg-mute); font-weight: 400; padding: 1px; }
+  .cal td { padding: 1px; color: var(--fg-dim); }
+  .cal td.today { color: var(--bg); background: var(--fg); }
 
-  /* mini map */
-  .mini-wrap { position: relative; }
-  #miniMap { display: block; width: min(100%, 30vh); aspect-ratio: 1; margin: 0 auto; }
-  .mini-info { position: absolute; bottom: 2px; right: 4px; font-size: 11px; color: var(--muted); }
-
-  /* bars */
-  .bar { margin: 3px 0 5px; }
-  .bar-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); letter-spacing: .04em; }
-  .bar-top b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
-  .track { position: relative; height: 9px; background: rgba(255,255,255,.07); border: 1px solid var(--line); }
-  .fill { position: absolute; top: 0; bottom: 0; left: 0; width: 0; transition: width .25s ease; }
-  .ticks { position: absolute; inset: 0; pointer-events: none; }
-  .ticks i { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgba(255,255,255,.35); }
-  .stage { font-size: 12px; }
-
-  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-  .chip { font-size: 11px; letter-spacing: .06em; padding: 2px 7px; border: 1px solid var(--line); color: var(--dim); text-transform: uppercase; }
-  .chip.on { color: var(--ink); border-color: var(--gold); }
-  .chip.on.danger { color: #fff; border-color: var(--bad); background: rgba(208,87,76,.25); }
-
-  /* stats grid */
-  .bigstat { display: flex; align-items: baseline; justify-content: space-between; }
-  .bigstat .n { font-size: 22px; letter-spacing: .02em; }
-  .res { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; font-size: 12px; margin-top: 6px; }
-  .res span { display: flex; justify-content: space-between; color: var(--muted); }
-  .res b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
-
-  /* lists (SkyUI style) */
-  .list { display: flex; flex-direction: column; }
-  .row { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 3px 2px; border-bottom: 1px solid rgba(255,255,255,.07); }
-  .row:last-child { border-bottom: 0; }
-  .ico { position: relative; width: 26px; height: 26px; }
+  /* right */
+  .charhead { display: flex; align-items: center; gap: 10px; }
+  .charname { font-size: 24px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lvring { position: relative; width: 34px; height: 34px; flex: none; }
+  .lvring svg { width: 34px; height: 34px; transform: rotate(-90deg); }
+  .lvring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 400; }
+  .goldcarry { margin-left: auto; text-align: right; font-size: 13px; white-space: nowrap; }
+  .vit { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; text-align: center; }
+  .vit .v { font-size: 24px; line-height: 1; }
+  .vit .l { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-mute); }
+  .vit .s { font-size: 11px; color: var(--fg-mute); }
+  .vh .v { color: #e3644e; } .vm .v { color: #5b98e0; } .vs .v { color: #79c062; }
+  .chips { display: flex; gap: 6px; margin-top: 6px; }
+  .chip { font-size: 11px; letter-spacing: .08em; padding: 1px 7px; border: 1px solid var(--line); color: var(--fg-mute); text-transform: uppercase; }
+  .chip.on { color: var(--fg); border-color: var(--fg-dim); } .chip.on.danger { color: #fff; border-color: var(--bad); background: rgba(224,80,64,.22); }
+  .surv { display: grid; grid-template-columns: 60px 1fr; gap: 1px 8px; align-items: center; font-size: 13px; }
+  .surv .st { grid-column: 2; font-size: 12px; color: var(--fg-dim); margin-bottom: 3px; }
+  .eq .row { display: flex; align-items: baseline; gap: 8px; font-size: 13px; padding: 1px 0; min-width: 0; }
+  .eq .slot { color: var(--fg-mute); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; min-width: 46px; flex: none; }
+  .eq .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .eq .r { margin-left: auto; white-space: nowrap; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1 1 0; min-height: 0; }
+  .eff { display: grid; grid-template-columns: 22px 1fr auto; gap: 0 6px; align-items: center; font-size: 13px; padding: 2px 0; }
+  .eff .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eff .src { grid-column: 2 / 4; font-size: 11px; color: var(--fg-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eff.bad .nm { color: #ffb3aa; }
+  .ico { position: relative; width: 20px; height: 20px; }
   .ico img { width: 100%; height: 100%; object-fit: contain; }
-  .ico .emb { position: absolute; right: -4px; bottom: -4px; width: 16px; height: 16px; }
+  .ico .emb { position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; }
   .ico.fallback { border: 1px solid var(--line); border-radius: 50%; }
-  .row .name { font-size: 14px; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row .right { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .row.bad .name { color: #ffb3aa; }
-  .row.inactive { opacity: .45; }
-  .tbar { height: 3px; background: rgba(255,255,255,.1); margin-top: 3px; }
-  .tbar i { display: block; height: 100%; background: var(--ink); }
-  .row.bad .tbar i { background: var(--bad); }
-  .row .desc { grid-column: 2 / 4; font-size: 12px; color: var(--muted); margin-top: -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .group-h { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 8px 0 2px; }
-  .group-h:first-child { margin-top: 0; }
-  .count { font-size: 15px; }
-  .count.low { color: var(--bad); }
-  .toggle { font-size: 11px; color: var(--muted); display: flex; gap: 6px; align-items: center; cursor: pointer; letter-spacing: .04em; text-transform: none; }
-  .toggle input { accent-color: var(--gold); }
+  .cons { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 0 8px; align-items: center; font-size: 13px; padding: 1px 0; }
+  .cons .cnt { min-width: 22px; text-align: right; }
 
-  @media (max-width: 1200px) {
-    html, body { overflow: auto; }
-    .app { grid-template-columns: 1fr; height: auto; }
-    .center { height: 65vh; order: -1; }
-    .col { overflow: visible; }
-    .panel .list { overflow: visible; }
+  /* settings / log pages */
+  .sheet { position: fixed; inset: 0; background: rgba(5,6,7,.85); display: none; justify-content: center; align-items: flex-start; padding: 50px 16px 24px; z-index: 5; overflow: auto; }
+  .sheet.open { display: flex; }
+  .sheet .panel { width: min(760px, 100%); }
+  .sheet .row2 { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
+
+  @media (max-width: 1100px) {
+    html, body { overflow: auto; height: auto; }
+    .app { height: auto; }
+    .grid { grid-template-columns: 1fr; }
+    .col.center { order: -1; }
+    .mapview { min-height: 60vh; }
+    .lowrow { grid-template-columns: 1fr; flex: none; }
+    .list, .pb { overflow: visible; }
   }
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- LEFT: effects + consumables -->
-  <aside class="col" id="colLeft">
-    <section class="panel" id="partyPanel" style="display:none">
-      <h2>Party <small id="partyCount"></small></h2>
-      <div class="list" id="party"></div>
-    </section>
-    <section class="panel grow3">
-      <h2>Active Effects <label class="toggle"><input type="checkbox" id="setHidden"> hidden</label></h2>
-      <div class="list" id="effects"><div class="empty">No active effects</div></div>
-    </section>
-    <section class="panel grow2">
-      <h2>Consumables <small id="consTotal"></small></h2>
-      <div class="sumchips" id="consSummary"></div>
-      <div class="list" id="consumables"><div class="empty">Nothing to show yet</div></div>
-    </section>
-  </aside>
+  <div class="topbar">
+    <span class="brand">Skyrim Companion</span>
+    <span class="conn"><span class="cdot" id="connDot"></span><span id="connText">Connecting…</span></span>
+    <nav class="tabs">
+      <button class="on" id="tabHub">Hub</button>
+      <button id="tabSettings">Settings</button>
+    </nav>
+  </div>
 
-  <!-- CENTER: world map -->
-  <main class="center">
-    <canvas id="worldMap"></canvas>
-    <div class="hud-top">
-      <div>
-        <div class="loc-big" id="whereBig">—</div>
-        <div class="loc-small" id="whereSmall"></div>
-      </div>
-      <div class="clock"><div class="t" id="clockT">—</div><div class="d" id="clockD"></div></div>
+  <div class="grid">
+    <!-- LEFT -->
+    <div class="col left">
+      <section class="panel">
+        <div class="ph"><h2>Opponent</h2></div>
+        <div class="pb"><div class="soon">Enemy tracking comes in a later build.</div></div>
+      </section>
+      <section class="panel grow">
+        <div class="ph"><h2>Party</h2><span class="meta num" id="partyCount"></span></div>
+        <div class="pb"><div class="list" id="party"><div class="empty">No one with you</div></div></div>
+      </section>
+      <section class="panel minipanel"><canvas id="miniMap"></canvas></section>
     </div>
-    <div class="compass"><div class="strip" id="compassStrip"></div><div class="needle"></div></div>
-    <div class="banner" id="banner"></div>
-    <div class="toolbar">
-      <button id="btnFollow" class="active">Follow</button>
-      <button id="btnFit">Whole map</button>
-      <button id="btnSpoil">Undiscovered: off</button>
-      <button id="btnTrailClear">Clear trail</button>
-    </div>
-    <div class="keys" id="keysHint">In game: NumPad + / − zoom · NumPad * map view · NumPad . undiscovered · NumPad / abilities</div>
-    <div class="status"><span class="dot" id="connDot"></span><span id="connText">Connecting…</span></div>
-    <div class="tooltip" id="tooltip"></div>
-  </main>
 
-  <!-- RIGHT: mini map, vitals, survival, gear -->
-  <aside class="col" id="colRight">
-    <section class="panel mini-wrap">
-      <h2>Local <small id="miniTitle"></small></h2>
-      <canvas id="miniMap"></canvas>
-      <div class="mini-info" id="miniInfo"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Vitals <small id="charLevel"></small></h2>
-      <div class="bar"><div class="bar-top"><span>Health</span><b id="hpText">—</b></div><div class="track"><div class="fill" id="hpFill" style="background:var(--health)"></div></div></div>
-      <div class="bar"><div class="bar-top"><span>Magicka</span><b id="mpText">—</b></div><div class="track"><div class="fill" id="mpFill" style="background:var(--magicka)"></div></div></div>
-      <div class="bar"><div class="bar-top"><span>Stamina</span><b id="spText">—</b></div><div class="track"><div class="fill" id="spFill" style="background:var(--stamina)"></div></div></div>
-      <div class="chips">
-        <span class="chip" id="chipCombat">Combat</span>
-        <span class="chip" id="chipSneak">Sneaking</span>
-        <span class="chip" id="chipMount">Mounted</span>
+    <!-- CENTER -->
+    <div class="col center">
+      <section class="panel mapp">
+        <div class="maphead">
+          <span class="loc" id="whereBig">—</span><span class="loc2" id="whereSmall"></span>
+          <span class="when num" id="when"></span>
+        </div>
+        <div class="mapview">
+          <canvas id="worldMap"></canvas>
+          <div class="mapctl">
+            <button class="chipbtn on" id="btnFollow">Follow</button>
+            <button class="chipbtn" id="btnFit">Whole map</button>
+            <button class="chipbtn" id="btnSpoil">Undiscovered</button>
+          </div>
+          <div class="banner" id="banner"></div>
+          <div class="tooltip" id="tooltip"></div>
+        </div>
+      </section>
+      <div class="lowrow">
+        <section class="panel"><div class="ph"><h2>Crosshair</h2></div><div class="pb"><div class="soon">Crosshair details come in a later build.</div></div></section>
+        <section class="panel alerts" id="alerts"><div class="ph"><h2>Alerts</h2><span class="meta">clears on load</span></div><div class="pb"><div class="list" id="events"><div class="empty">Nothing yet</div></div></div></section>
+        <section class="panel cal"><div class="ph"><h2 id="calMonth">Calendar</h2><span class="meta" id="calYear"></span></div><div class="pb" id="cal"></div></section>
       </div>
-    </section>
+    </div>
 
-    <section class="panel" id="survivalPanel">
-      <h2>Survival <small id="ambient"></small></h2>
-      <div id="survival"><div class="empty">Survival Mode not detected</div></div>
-    </section>
+    <!-- RIGHT -->
+    <div class="col right">
+      <section class="panel">
+        <div class="pb">
+          <div class="charhead">
+            <span class="charname" id="charName">—</span>
+            <span class="lvring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#2a2d2f" stroke-width="3"/></svg><b id="charLevel">–</b></span>
+            <span class="goldcarry"><span class="goldc num" id="gold"></span><br><span class="dim num" id="carryTop"></span></span>
+          </div>
+          <div class="vit">
+            <div class="vh"><div class="v num" id="vH">–</div><div class="l">Health</div><div class="s num" id="vHm"></div></div>
+            <div class="vm"><div class="v num" id="vM">–</div><div class="l">Magicka</div><div class="s num" id="vMm"></div></div>
+            <div class="vs"><div class="v num" id="vS">–</div><div class="l">Stamina</div><div class="s num" id="vSm"></div></div>
+          </div>
+          <div class="chips"><span class="chip" id="chipCombat">Combat</span><span class="chip" id="chipSneak">Sneaking</span><span class="chip" id="chipMount">Mounted</span></div>
+        </div>
+      </section>
 
-    <section class="panel grow">
-      <h2>Equipment <small id="gold"></small></h2>
-      <div class="bigstat"><span class="muted">Armor rating</span><span class="n" id="armorRating">—</span></div>
-      <div class="res" id="resists"></div>
-      <div class="bar" style="margin-top:6px"><div class="bar-top"><span>Carry weight</span><b id="carryText">—</b></div><div class="track"><div class="fill" id="carryFill" style="background:var(--gold)"></div></div></div>
-      <div class="list" id="equipment"><div class="empty">Nothing equipped</div></div>
-    </section>
-  </aside>
+      <section class="panel">
+        <div class="ph"><h2>Survival</h2><span class="meta" id="ambient"></span></div>
+        <div class="pb"><div class="surv" id="survival"><div class="empty">Survival Mode not detected</div></div></div>
+      </section>
+
+      <section class="panel eq">
+        <div class="ph"><h2>Equipment</h2><span class="meta num" id="armorRating"></span></div>
+        <div class="pb">
+          <div id="hands"></div>
+          <div class="rule"></div>
+          <div id="worn"></div>
+          <div class="row" style="font-size:12px"><span class="dim num" id="resists"></span></div>
+          <div class="row" style="font-size:12px"><span class="dim">Carry</span><span class="r num dim" id="carryText"></span></div>
+          <div class="bar"><i id="carryFill" style="width:0;background:var(--fg-dim)"></i></div>
+        </div>
+      </section>
+
+      <div class="split">
+        <section class="panel">
+          <div class="ph"><h2>Effects</h2><span class="meta"><span class="key">/</span> abilities</span></div>
+          <div class="pb"><div class="list" id="effects"><div class="empty">No active effects</div></div></div>
+        </section>
+        <section class="panel">
+          <div class="ph"><h2>Supplies</h2></div>
+          <div class="pb"><div class="list" id="consumables"><div class="empty">Nothing yet</div></div></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="sheet">
+  <section class="panel">
+    <div class="ph"><h2>Settings</h2><button class="chipbtn" id="sheetClose" style="margin-left:auto">Close</button></div>
+    <div class="pb" id="sheetBody" style="overflow:auto"></div>
+  </section>
 </div>
 
 <script>
 (() => {
   "use strict";
-
-  // ---------- helpers ----------
   const $ = (id) => document.getElementById(id);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const store = {
-    get(k, d) { try { const v = localStorage.getItem("sc2." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem("sc2." + k, JSON.stringify(v)); } catch {} }
+    get(k, d) { try { const v = localStorage.getItem("sc3." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("sc3." + k, JSON.stringify(v)); } catch {} }
   };
   const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:7171";
   const ASSETS = "assets/";
+  const FONT = () => getComputedStyle(document.body).fontFamily;
 
-  // Image cache that remembers failures, so missing icons fall back quietly.
   const imgCache = new Map();
   function img(path) {
     let e = imgCache.get(path);
@@ -258,13 +289,8 @@
   }
 
   // ---------- map marker icons (CoMAP / Map Marker Framework) ----------
-  const iconDefs = new Map();   // definition name -> { exportName, undiscovered, scale }
-  const refIcons = new Map();   // "plugin|hex" -> { iconName } or { icon }
-  const typeScale = new Map();  // vanilla index -> scale
-  const normRef = (r) => {
-    const [p, id] = String(r).split("|");
-    return p && id ? p.trim().toLowerCase() + "|" + parseInt(id, 16).toString(16) : "";
-  };
+  const iconDefs = new Map(), refIcons = new Map(), typeScale = new Map();
+  const normRef = (r) => { const [p, id] = String(r).split("|"); return p && id ? p.trim().toLowerCase() + "|" + parseInt(id, 16).toString(16) : ""; };
   function stripJsonComments(text) {
     let out = "", inStr = false, i = 0;
     while (i < text.length) {
@@ -278,23 +304,16 @@
     return out.replace(/,\s*([\]}])/g, "$1");
   }
   function loadMarkerConfigs(files) {
-    // Skyrim.json defines the base set; load it first, then everything else alphabetically.
     const names = Object.keys(files).sort((a, b) => (a === "Skyrim.json" ? -1 : b === "Skyrim.json" ? 1 : a.localeCompare(b)));
     for (const name of names) {
-      let cfg;
-      try { cfg = JSON.parse(stripJsonComments(files[name])); } catch { continue; }
+      let cfg; try { cfg = JSON.parse(stripJsonComments(files[name])); } catch { continue; }
       for (const d of cfg.iconDefinitions || []) {
-        if (d.name && d.source && d.source.exportNames) {
-          iconDefs.set(d.name, { exportName: d.source.exportNames[0], undiscovered: d.source.exportNames[1] || d.source.exportNames[0], scale: d.scale || 1 });
-        } else if (typeof d.index === "number" && d.scale) {
-          typeScale.set(d.index, d.scale);
-        }
+        if (d.name && d.source && d.source.exportNames) iconDefs.set(d.name, { exportName: d.source.exportNames[0], undiscovered: d.source.exportNames[1] || d.source.exportNames[0], scale: d.scale || 1 });
+        else if (typeof d.index === "number" && d.scale) typeScale.set(d.index, d.scale);
       }
       for (const m of cfg.mapMarkers || []) {
-        const key = normRef(m.refID);
-        if (!key) continue;
-        if (m.iconName) refIcons.set(key, { iconName: m.iconName });
-        else if (typeof m.icon === "number") refIcons.set(key, { icon: m.icon });
+        const key = normRef(m.refID); if (!key) continue;
+        if (m.iconName) refIcons.set(key, { iconName: m.iconName }); else if (typeof m.icon === "number") refIcons.set(key, { icon: m.icon });
       }
     }
   }
@@ -302,70 +321,67 @@
   function markerIcon(m) {
     const assign = m.ref ? refIcons.get(normRef(m.ref)) : null;
     let file, scale = 1;
-    if (assign && assign.iconName && iconDefs.has(assign.iconName)) {
-      const d = iconDefs.get(assign.iconName);
-      file = m.discovered ? d.exportName : d.undiscovered; scale = d.scale;
-    } else {
-      const type = assign && typeof assign.icon === "number" ? assign.icon : m.type;
-      if (type >= 1 && type <= 59) { file = "CoMAP " + type + (m.discovered ? "" : " Undiscovered"); scale = typeScale.get(type) || 1; }
-    }
+    if (assign && assign.iconName && iconDefs.has(assign.iconName)) { const d = iconDefs.get(assign.iconName); file = m.discovered ? d.exportName : d.undiscovered; scale = d.scale; }
+    else { const type = assign && typeof assign.icon === "number" ? assign.icon : m.type; if (type >= 1 && type <= 59) { file = "CoMAP " + type + (m.discovered ? "" : " Undiscovered"); scale = typeScale.get(type) || 1; } }
     return file ? { e: img("markers/" + safeFile(file) + ".png"), scale } : null;
   }
-  // Fallback shapes when an icon is missing.
   const CITY = new Set([1]), TOWN = new Set([2, 3, 54]);
-  function drawFallbackMarker(ctx, x, y, m, size) {
-    const r = CITY.has(m.type) ? size * 0.42 : TOWN.has(m.type) ? size * 0.34 : size * 0.26;
-    ctx.save(); ctx.globalAlpha = m.discovered ? 1 : 0.5;
-    ctx.fillStyle = "#2a241b"; ctx.strokeStyle = "#e9dcc0"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
-  }
   function drawMarker(ctx, x, y, m, size) {
     const ic = markerIcon(m);
-    if (ic && ic.e.ok) {
-      const s = size * Math.min(1.6, ic.scale);
-      ctx.save(); ctx.globalAlpha = m.discovered ? 1 : 0.75;
-      ctx.drawImage(ic.e.el, x - s / 2, y - s / 2, s, s); ctx.restore();
-    } else drawFallbackMarker(ctx, x, y, m, size);
-  }
-  // Followers in the same space as the player, drawn as small green dots.
-  function drawFollowers(ctx, toScreen, s) {
-    for (const f of (s.followers || [])) {
-      if (f.dead || !f.sameSpace) continue;
-      const [x, y] = toScreen(f.x, f.y);
-      ctx.save(); ctx.fillStyle = f.status === "Downed" ? "#ff5a4a" : "#7fd36b"; ctx.strokeStyle = "#10140c"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
-    }
+    if (ic && ic.e.ok) { const s = size * Math.min(1.6, ic.scale); ctx.save(); ctx.globalAlpha = m.discovered ? 1 : .75; ctx.drawImage(ic.e.el, x - s / 2, y - s / 2, s, s); ctx.restore(); return; }
+    const r = CITY.has(m.type) ? size * .42 : TOWN.has(m.type) ? size * .34 : size * .26;
+    ctx.save(); ctx.globalAlpha = m.discovered ? 1 : .5; ctx.fillStyle = "#2a241b"; ctx.strokeStyle = "#e9dcc0"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
   }
   function drawPlayer(ctx, x, y, headingDeg, size) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(headingDeg * Math.PI / 180);
-    ctx.beginPath(); ctx.moveTo(0, -size); ctx.lineTo(size * 0.68, size * 0.78); ctx.lineTo(0, size * 0.38); ctx.lineTo(-size * 0.68, size * 0.78); ctx.closePath();
-    ctx.fillStyle = "#f6e7b8"; ctx.strokeStyle = "#1a140c"; ctx.lineWidth = 2.5; ctx.fill(); ctx.stroke(); ctx.restore();
+    ctx.beginPath(); ctx.moveTo(0, -size); ctx.lineTo(size * .68, size * .78); ctx.lineTo(0, size * .38); ctx.lineTo(-size * .68, size * .78); ctx.closePath();
+    ctx.fillStyle = "#f6efd9"; ctx.strokeStyle = "#1a140c"; ctx.lineWidth = 2.5; ctx.fill(); ctx.stroke(); ctx.restore();
   }
 
-  // ---------- SkyUI effect icon rules (ported from SkyUI's EffectIconMap) ----------
-  const ARCH = { 10: "conjure", 11: "invisibility", 12: "light", 17: "bound_item", 18: "conjure", 21: "paralysis", 25: "clairvoyance",
-    35: "cloak", 36: "werewolf", 37: "slow_time", 39: "ench_weapon", 41: "ethereal", 46: "vampire" };
+  // ---------- party colors and follower dots ----------
+  const PALETTE = ["#e7c35a", "#5fc0c8", "#c58a5a", "#b48ad8", "#8fcf6a", "#e48aa0", "#a4a9b4", "#e09a4a"];
+  const colorMap = store.get("followerColors", {});
+  function followerColor(name) {
+    if (!colorMap[name]) { colorMap[name] = PALETTE[Object.keys(colorMap).length % PALETTE.length]; store.set("followerColors", colorMap); }
+    return colorMap[name];
+  }
+  const deathSpots = new Map(); // name -> {x,y,ws}, until the next load
+  function drawFollowers(ctx, toScreen, s, t) {
+    for (const f of (s.followers || [])) {
+      const c = followerColor(f.name);
+      if (f.dead) {
+        const d = deathSpots.get(f.name); if (!d || d.ws !== s.where.worldspaceId || s.where.interior) continue;
+        const [x, y] = toScreen(d.x, d.y); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 5, y + 5); ctx.moveTo(x + 5, y - 5); ctx.lineTo(x - 5, y + 5); ctx.stroke(); ctx.restore();
+        continue;
+      }
+      if (!f.sameSpace) continue;
+      const [x, y] = toScreen(f.x, f.y);
+      ctx.save();
+      if (f.status === "Downed") {
+        ctx.fillStyle = c; ctx.font = `700 ${Math.round(20 + 4 * Math.sin(t / 160))}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.lineWidth = 3; ctx.strokeStyle = "#000"; ctx.strokeText("!", x, y); ctx.fillText("!", x, y);
+      } else { ctx.fillStyle = c; ctx.strokeStyle = "#10140c"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+
+  // ---------- SkyUI effect icon rules ----------
+  const ARCH = { 10: "conjure", 11: "invisibility", 12: "light", 17: "bound_item", 18: "conjure", 21: "paralysis", 25: "clairvoyance", 35: "cloak", 36: "werewolf", 37: "slow_time", 39: "ench_weapon", 41: "ethereal", 46: "vampire" };
   const AVI = {};
-  const skills = ["av_skill_weapon_1h", "av_skill_weapon_2h", "av_skill_archery", "av_skill_block", "av_skill_smithing", "av_skill_armor_heavy",
-    "av_skill_armor_light", "av_skill_pickpocket", "av_skill_lockpicking", "av_skill_sneak", "av_skill_alchemy", "av_skill_persuasion",
-    "av_skill_alteration", "av_skill_conjuration", "av_skill_destruction", "av_skill_illusion", "av_skill_restoration", "av_skill_enchanting"];
-  skills.forEach((s, i) => { AVI[6 + i] = s; AVI[96 + i] = s; AVI[114 + i] = s; AVI[135 + i] = s; });
-  Object.assign(AVI, { 24: "av_health", 25: "av_magicka", 26: "av_stamina", 27: "av_health_regen", 28: "av_magicka_regen", 29: "av_stamina_regen",
-    30: "av_speedmult", 32: "av_carryweight", 34: "av_skill_unarmed", 35: "av_skill_unarmed", 39: "av_resist_damage", 40: "av_resist_poison",
-    41: "av_resist_fire", 42: "av_resist_shock", 43: "av_resist_frost", 44: "av_resist_magic", 45: "av_resist_disease", 53: "paralysis",
-    54: "invisibility", 55: "av_nighteye", 57: "av_waterbreathing", 58: "av_waterwalking", 63: "av_ward", 65: "av_armorperks", 78: "av_bow_speed",
-    83: "av_absorb", 85: "av_weapon_speed", 86: "av_skill_shout", 87: "av_bow_stagger", 92: "av_noise", 155: "av_health_regen",
-    156: "av_magicka_regen", 157: "av_stamina_regen" });
+  ["av_skill_weapon_1h", "av_skill_weapon_2h", "av_skill_archery", "av_skill_block", "av_skill_smithing", "av_skill_armor_heavy", "av_skill_armor_light", "av_skill_pickpocket", "av_skill_lockpicking", "av_skill_sneak",
+    "av_skill_alchemy", "av_skill_persuasion", "av_skill_alteration", "av_skill_conjuration", "av_skill_destruction", "av_skill_illusion", "av_skill_restoration", "av_skill_enchanting"]
+    .forEach((s, i) => { AVI[6 + i] = s; AVI[96 + i] = s; AVI[114 + i] = s; AVI[135 + i] = s; });
+  Object.assign(AVI, { 24: "av_health", 25: "av_magicka", 26: "av_stamina", 27: "av_health_regen", 28: "av_magicka_regen", 29: "av_stamina_regen", 30: "av_speedmult", 32: "av_carryweight", 34: "av_skill_unarmed", 35: "av_skill_unarmed",
+    39: "av_resist_damage", 40: "av_resist_poison", 41: "av_resist_fire", 42: "av_resist_shock", 43: "av_resist_frost", 44: "av_resist_magic", 45: "av_resist_disease", 53: "paralysis", 54: "invisibility", 55: "av_nighteye",
+    57: "av_waterbreathing", 58: "av_waterwalking", 63: "av_ward", 65: "av_armorperks", 78: "av_bow_speed", 83: "av_absorb", 85: "av_weapon_speed", 86: "av_skill_shout", 87: "av_bow_stagger", 92: "av_noise", 155: "av_health_regen", 156: "av_magicka_regen", 157: "av_stamina_regen" });
   function effectIcon(e) {
     let base = ARCH[e.archetype], emblem = null;
     if (!base) {
-      if (e.archetype === 0 || e.archetype === 5 || e.archetype === 34) {
-        emblem = e.detrimental ? (e.recover ? "drain" : "damage") : (e.recover ? "fortify" : "restore");
-      }
+      if (e.archetype === 0 || e.archetype === 5 || e.archetype === 34) emblem = e.detrimental ? (e.recover ? "drain" : "damage") : (e.recover ? "fortify" : "restore");
       base = AVI[e.av];
-      if (e.av === 24) {
-        if (e.resist === 41) base = "fire"; else if (e.resist === 43) base = "frost"; else if (e.resist === 42) base = "shock";
-      }
+      if (e.av === 24) { if (e.resist === 41) base = "fire"; else if (e.resist === 43) base = "frost"; else if (e.resist === 42) base = "shock"; }
       if (!base) base = "default_effect";
     }
     return { base, emblem };
@@ -374,101 +390,63 @@
     return `<div class="ico"><img src="${ASSETS}${esc(path)}" alt="" onerror="this.parentNode.classList.add('fallback');this.remove()">` +
       (emblemPath ? `<img class="emb" src="${ASSETS}${esc(emblemPath)}" alt="" onerror="this.remove()">` : "") + `</div>`;
   }
-
-  // ---------- SkyUI item icon rules (subset of InventoryIconSetter) ----------
-  const WEAPON_ICON = { 0: "default_weapon", 1: "weapon_sword", 2: "weapon_dagger", 3: "weapon_waraxe", 4: "weapon_mace", 5: "weapon_greatsword",
-    6: "weapon_battleaxe", 7: "weapon_bow", 8: "weapon_staff", 9: "weapon_crossbow" };
-  function armorIcon(slot, weight) {
-    const part = { head: "head", body: "body", hands: "hands", forearms: "forearms", feet: "feet", calves: "calves", shield: "shield" }[slot];
-    if (weight === "jewelry" || slot === "amulet" || slot === "ring") return slot === "ring" ? "armor_ring" : slot === "amulet" ? "armor_amulet" : "armor_circlet";
-    if (!part) return "default_armor";
-    if (weight === "light") return "lightarmor_" + part;
-    if (weight === "heavy") return "armor_" + part;
-    return "clothing_" + part;
-  }
   function potionIcon(p) {
-    if (p.kind === "poison") return "potion_poison";
-    if (p.kind === "food") return "default_food";
-    const e = mainEffect(p);
-    if (!e) return "default_potion";
-    if ([24, 27, 155].includes(e.av)) return "potion_health";
-    if ([25, 28, 156].includes(e.av)) return "potion_magic";
-    if ([26, 29, 157].includes(e.av)) return "potion_stam";
-    if (e.av === 41) return "potion_fire";
-    if (e.av === 42) return "potion_shock";
-    if (e.av === 43) return "potion_frost";
+    if (p.kind === "poison") return "potion_poison"; if (p.kind === "food") return "default_food";
+    const e = mainEffect(p); if (!e) return "default_potion";
+    if ([24, 27, 155].includes(e.av)) return "potion_health"; if ([25, 28, 156].includes(e.av)) return "potion_magic"; if ([26, 29, 157].includes(e.av)) return "potion_stam";
     return "default_potion";
   }
 
-  // Shows as many rows as fit in the panel and replaces the rest with "+N more", so nothing needs scrolling.
+  // Shows as many rows as fit and replaces the rest with "+N more", so nothing needs scrolling.
   function fitList(el, noun) {
-    if (!el || window.innerWidth <= 1200) return;
+    if (!el || window.innerWidth <= 1100) return;
     const rows = () => [...el.children].filter(c => !c.classList.contains("more"));
     let hidden = 0, guard = 200;
     while (el.scrollHeight > el.clientHeight + 1 && guard-- > 0) {
-      const r = rows(); const last = r[r.length - 1];
-      if (!last || r.length <= 1) break;
-      last.remove(); if (!last.classList.contains("group-h")) hidden++;
-      let m = el.querySelector(".more");
-      if (!m) { m = document.createElement("div"); m.className = "more"; el.appendChild(m); }
+      const r = rows(); const last = r[r.length - 1]; if (!last || r.length <= 1) break;
+      last.remove(); if (!last.classList.contains("grp")) hidden++;
+      let m = el.querySelector(".more"); if (!m) { m = document.createElement("div"); m.className = "more"; el.appendChild(m); }
       m.textContent = `+${hidden} more ${noun}`;
     }
-    // Don't end on a lonely group header.
-    const r = rows(); if (r.length && r[r.length - 1].classList.contains("group-h")) r[r.length - 1].remove();
+    const r = rows(); if (r.length && r[r.length - 1].classList.contains("grp")) r[r.length - 1].remove();
   }
 
   // ---------- state ----------
-  const app = {
-    demo: false, state: null, shown: null, markers: [], worldspace: 0, mapInfo: null, mapImg: null,
-    trail: store.get("trail", {}), follow: true, view: { x: 0, y: 0, scale: 0.005 },
-    settings: Object.assign({ spoilers: false, hidden: false }, store.get("settings", {})),
-    maps: null
-  };
+  const app = { demo: false, state: null, shown: null, markers: [], worldspace: 0, mapInfo: null, mapImg: null, follow: true,
+    view: { x: 0, y: 0, scale: .005 }, settings: Object.assign({ spoilers: false }, store.get("settings", {})), maps: null };
 
-  // ---------- networking ----------
   let failures = 0, inflight = false;
-  async function fetchJson(path) {
-    const r = await fetch(BASE + path, { cache: "no-store" });
-    if (!r.ok) throw new Error(r.status);
-    return r.json();
-  }
+  async function fetchJson(path) { const r = await fetch(BASE + path, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); }
   async function pollState() {
-    if (app.demo || inflight) return;
-    inflight = true;
+    if (app.demo || inflight) return; inflight = true;
     try { const s = await fetchJson("/api/state"); failures = 0; onState(s); }
     catch { failures++; if (failures === 15) showOffline(); setConn("bad", "Game not reachable"); }
     finally { inflight = false; }
   }
   async function pollMarkers() { if (!app.demo) try { onMarkers(await fetchJson("/api/markers")); } catch {} }
-  function setConn(k, t) { $("connDot").className = "dot " + k; $("connText").textContent = t; }
+  function setConn(k, t) { $("connDot").className = "cdot " + k; $("connText").textContent = t; }
   function showOffline() {
     const b = $("banner");
-    b.innerHTML = "<p>Can't reach the game. Start Skyrim through SKSE with Skyrim Companion installed and this page connects by itself.</p><button id='btnDemo'>Try demo mode</button>";
-    b.style.display = "block";
-    $("btnDemo").onclick = startDemo;
+    b.innerHTML = "<p>Can't reach the game. Start Skyrim through SKSE with Skyrim Companion installed and this page connects by itself.</p><button class='chipbtn' id='btnDemo'>Try demo mode</button>";
+    b.style.display = "block"; $("btnDemo").onclick = startDemo;
   }
-
   async function loadStatic() {
     try { app.maps = await (await fetch(ASSETS + "map/maps.json", { cache: "no-store" })).json(); } catch { app.maps = {}; }
     if (!app.demo) { try { loadMarkerConfigs(await fetchJson("/api/mapmarker-configs")); } catch {} }
   }
 
-  // Hotkeys pressed in game arrive as numbered commands, so the page never needs the mouse.
-  let lastCmd = null;
-  const VIEWS = [{ follow: true, scale: 0.012 }, { follow: true, scale: 0.004 }, { follow: false, whole: true }];
-  let viewIdx = 0;
+  // In-game hotkeys arrive as numbered commands.
+  let lastCmd = null, viewIdx = 0, abilitiesOpen = store.get("abilitiesOpen", false);
+  const VIEWS = [{ follow: true, scale: .012 }, { follow: true, scale: .004 }, { follow: false, whole: true }];
   function runCommands(cmds) {
     if (!cmds || !cmds.length) return;
     const maxId = Math.max(...cmds.map(c => c.id));
-    if (lastCmd === null) { lastCmd = maxId; return; } // don't replay presses from before the page opened
+    if (lastCmd === null) { lastCmd = maxId; return; }
     for (const c of cmds.filter(c => c.id > lastCmd).sort((a, b) => a.id - b.id)) {
-      if (c.cmd === "zoomIn") app.view.scale = clamp(app.view.scale * 1.5, 0.0006, 0.08);
-      else if (c.cmd === "zoomOut") app.view.scale = clamp(app.view.scale / 1.5, 0.0006, 0.08);
-      else if (c.cmd === "cycleView") {
-        viewIdx = (viewIdx + 1) % VIEWS.length; const v = VIEWS[viewIdx];
-        app.follow = v.follow; $("btnFollow").classList.toggle("active", v.follow);
-        if (v.whole) fitWorld(); else app.view.scale = v.scale;
-      } else if (c.cmd === "toggleUndiscovered") { app.settings.spoilers = !app.settings.spoilers; store.set("settings", app.settings); syncSpoil(); }
+      if (c.cmd === "zoomIn") app.view.scale = clamp(app.view.scale * 1.5, .0006, .08);
+      else if (c.cmd === "zoomOut") app.view.scale = clamp(app.view.scale / 1.5, .0006, .08);
+      else if (c.cmd === "cycleView") { viewIdx = (viewIdx + 1) % VIEWS.length; const v = VIEWS[viewIdx]; setFollow(v.follow); if (v.whole) fitWorld(); else app.view.scale = v.scale; }
+      else if (c.cmd === "toggleUndiscovered") { app.settings.spoilers = !app.settings.spoilers; store.set("settings", app.settings); syncSpoil(); }
       else if (c.cmd === "toggleAbilities") { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); }
     }
     lastCmd = Math.max(lastCmd, maxId);
@@ -476,48 +454,71 @@
 
   function onState(s) {
     runCommands(s.commands);
-    if (!s.ready) { app.state = null; setConn("wait", "Waiting for a loaded save…"); return; }
+    if (!s.ready) {
+      if (app.state) resetSession();
+      app.state = null; setConn("wait", "Waiting for a loaded save…"); return;
+    }
     $("banner").style.display = "none";
     setConn("ok", app.demo ? "Demo mode" : "Live");
-    const prev = app.state;
-    app.state = s;
-    if (!app.shown || (prev && Math.hypot(s.player.x - prev.player.x, s.player.y - prev.player.y) > 3000)) {
-      app.shown = { x: s.player.x, y: s.player.y, h: s.player.heading };
-    }
+    const prev = app.state; app.state = s;
+    if (!app.shown || (prev && Math.hypot(s.player.x - prev.player.x, s.player.y - prev.player.y) > 3000)) app.shown = { x: s.player.x, y: s.player.y, h: s.player.heading };
     const ws = s.where.worldspaceId;
     if (ws && ws !== app.worldspace) { app.worldspace = ws; selectMap(s.where.worldspaceEdid); }
-    addTrail(s);
+    watchAlerts(prev, s);
     renderPanels(s);
   }
-  function onMarkers(m) {
-    const first = !app.markers.length;
-    app.markers = m.markers || [];
-    if (first && app.markers.length && !app.follow) fitWorld();
-  }
-  function selectMap(edid) {
-    const info = app.maps && app.maps[edid];
-    app.mapInfo = info || null;
-    app.mapImg = info ? img(info.image) : null;
-  }
+  function onMarkers(m) { const first = !app.markers.length; app.markers = m.markers || []; if (first && app.markers.length && !app.follow) fitWorld(); }
+  function selectMap(edid) { const info = app.maps && app.maps[edid]; app.mapInfo = info || null; app.mapImg = info ? img(info.image) : null; }
 
-  // ---------- trail ----------
-  const trailKey = (s) => s.where.interior ? "cell:" + s.where.cell : "ws:" + s.where.worldspaceId;
-  let lastSave = 0;
-  function addTrail(s) {
-    const pts = app.trail[trailKey(s)] || (app.trail[trailKey(s)] = []);
-    const last = pts[pts.length - 1];
-    const step = s.where.interior ? 40 : 250;
-    const d = last ? Math.hypot(last[0] - s.player.x, last[1] - s.player.y) : Infinity;
-    if (d > step) { if (last && d > 3000) pts.push(null); pts.push([Math.round(s.player.x), Math.round(s.player.y)]); if (pts.length > 4000) pts.splice(0, pts.length - 4000); }
-    const keys = Object.keys(app.trail); if (keys.length > 30) delete app.trail[keys[0]];
-    if (Date.now() - lastSave > 5000) { lastSave = Date.now(); store.set("trail", app.trail); }
+  // ---------- alerts (built from what the hub already sees; cleared on every load) ----------
+  const events = [];
+  function resetSession() { events.length = 0; deathSpots.clear(); renderEvents(); }
+  function gameTime(s) {
+    if (!s || !s.time) return "";
+    const hr = s.time.hour, H = Math.floor(hr), M = Math.floor((hr - H) * 60);
+    return ((H + 11) % 12 + 1) + ":" + String(M).padStart(2, "0") + (H < 12 ? " AM" : " PM");
   }
-  function strokeTrail(ctx, pts, toScreen, color, width) {
-    if (!pts || pts.length < 2) return;
-    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = ctx.lineCap = "round"; ctx.setLineDash([2, 5]);
-    ctx.beginPath(); let pen = false;
-    for (const p of pts) { if (!p) { pen = false; continue; } const [x, y] = toScreen(p[0], p[1]); if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; } }
-    ctx.stroke(); ctx.restore();
+  function addEvent(s, text, urgent) {
+    events.unshift({ t: gameTime(s), text, urgent: !!urgent });
+    if (events.length > 60) events.pop();
+    renderEvents();
+    const a = $("alerts"); a.classList.add("flash"); clearTimeout(a._t); a._t = setTimeout(() => a.classList.remove("flash"), 1800);
+  }
+  function renderEvents() {
+    const el = $("events");
+    el.innerHTML = events.length ? events.map(e => `<div class="ev ${e.urgent ? "urgent" : ""}"><span class="t num">${esc(e.t)}</span><span>${esc(e.text)}</span></div>`).join("") : `<div class="empty">Nothing yet</div>`;
+    fitList(el, "alerts");
+  }
+  const restoreCounts = (s) => { const c = { h: 0, m: 0, s: 0 }; for (const p of s.consumables || []) { const k = restoreKind(p); if (k) c[k] += p.count; } return c; };
+  function watchAlerts(prev, s) {
+    if (!prev) return;
+    const p0 = prev.player, p1 = s.player;
+    if (p1.level > p0.level) addEvent(s, `Level up: ${p1.level}`);
+    if (p1.inCombat && !p0.inCombat) addEvent(s, "Combat started", true);
+    if (!p1.inCombat && p0.inCombat) addEvent(s, "Combat ended");
+    const loc0 = prev.where.interior ? prev.where.cell : prev.where.location, loc1 = s.where.interior ? s.where.cell : s.where.location;
+    if (loc1 && loc1 !== loc0) addEvent(s, "Entered " + loc1);
+    const hp = s.stats.health; if (hp.max > 0 && hp.cur / hp.max < .25 && prev.stats.health.cur / prev.stats.health.max >= .25) addEvent(s, "Health low", true);
+    const old = new Map((prev.followers || []).map(f => [f.name, f]));
+    for (const f of s.followers || []) {
+      const o = old.get(f.name);
+      if (!o) { addEvent(s, `${f.name} joined you`); continue; }
+      if (f.status === "Downed" && o.status !== "Downed") addEvent(s, `${f.name} is down`, true);
+      if (f.dead && !o.dead) { addEvent(s, `${f.name} died`, true); deathSpots.set(f.name, { x: o.x, y: o.y, ws: o.worldspaceId }); }
+    }
+    for (const o of prev.followers || []) if (!(s.followers || []).some(f => f.name === o.name)) addEvent(s, `${o.name} left your service`);
+    if (prev.consumables && s.consumables) {
+      const a = restoreCounts(prev), b = restoreCounts(s);
+      for (const [k, n] of [["h", "Health"], ["m", "Magicka"], ["s", "Stamina"]]) if (b[k] <= 2 && a[k] > 2) addEvent(s, `${n} potions low (${b[k]} left)`, true);
+    }
+    if (s.equipment && prev.equipment && s.equipment.carry && prev.equipment.carry) {
+      const over = (e) => e.carry.cur > e.carry.max;
+      if (over(s.equipment) && !over(prev.equipment)) addEvent(s, "Over-encumbered", true);
+    }
+    const sv0 = prev.survival, sv1 = s.survival;
+    if (sv0 && sv1) for (const [k, names] of [["hunger", HUNGER], ["cold", COLD], ["fatigue", FATIGUE]]) {
+      if (sv0[k] && sv1[k]) { const a = stageFrom(sv0[k]), b = stageFrom(sv1[k]); if (b > a) addEvent(s, `${sv1[k].name}: ${names[b] || "worse"}`, b >= 3); }
+    }
   }
 
   // ---------- world map ----------
@@ -527,70 +528,44 @@
   const visible = () => app.markers.filter(m => app.settings.spoilers || m.seen || m.discovered);
   function fitWorld() {
     const w = world.clientWidth, h = world.clientHeight;
-    if (app.mapInfo) {
-      // The drawn land fills roughly the middle 87% x 58% of the paper map image.
-      app.view.x = app.mapInfo.cx + app.mapInfo.span * 0.015; app.view.y = app.mapInfo.cy - app.mapInfo.span * 0.015;
-      app.view.scale = Math.min(w / (app.mapInfo.span * 0.9), h / (app.mapInfo.span * 0.62));
-      return;
-    }
+    if (app.mapInfo) { app.view.x = app.mapInfo.cx + app.mapInfo.span * .015; app.view.y = app.mapInfo.cy - app.mapInfo.span * .015; app.view.scale = Math.min(w / (app.mapInfo.span * .9), h / (app.mapInfo.span * .62)); return; }
     if (!app.markers.length) return;
     let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
     for (const m of app.markers) { a = Math.min(a, m.x); c = Math.max(c, m.x); b = Math.min(b, m.y); d = Math.max(d, m.y); }
-    app.view.x = (a + c) / 2; app.view.y = (b + d) / 2; app.view.scale = Math.min(w / (c - a || 1), h / (d - b || 1)) * 0.9;
+    app.view.x = (a + c) / 2; app.view.y = (b + d) / 2; app.view.scale = Math.min(w / (c - a || 1), h / (d - b || 1)) * .9;
   }
-  // Paper map placement: image pixel = (0.5 + (X - cx) / span) * size, (0.5 - (Y - cy) / span) * size
   function drawMapImage(ctx, toScreen) {
     if (!app.mapInfo || !app.mapImg || !app.mapImg.ok) return false;
     const { span, cx, cy } = app.mapInfo;
     const [x0, y0] = toScreen(cx - span / 2, cy + span / 2), [x1, y1] = toScreen(cx + span / 2, cy - span / 2);
-    ctx.drawImage(app.mapImg.el, x0, y0, x1 - x0, y1 - y0);
-    return true;
+    ctx.drawImage(app.mapImg.el, x0, y0, x1 - x0, y1 - y0); return true;
   }
-  function drawWorld() {
+  function drawWorld(t) {
     const w = world.clientWidth, h = world.clientHeight, ctx = wctx, s = app.state;
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
     if (app.follow && app.shown) { app.view.x = app.shown.x; app.view.y = app.shown.y; }
-    if (!drawMapImage(ctx, W2S)) {
-      ctx.strokeStyle = "rgba(255,255,255,.05)"; ctx.lineWidth = 1;
-      const step = 16384, [gx0, gy1] = S2W(0, 0), [gx1, gy0] = S2W(w, h);
-      for (let x = Math.floor(gx0 / step) * step; x <= gx1; x += step) { const [sx] = W2S(x, 0); ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke(); }
-      for (let y = Math.floor(gy0 / step) * step; y <= gy1; y += step) { const [, sy] = W2S(0, y); ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke(); }
-    }
-    if (s && !s.where.interior) strokeTrail(ctx, app.trail[trailKey(s)], W2S, "rgba(120,20,10,.85)", 2.5);
-
-    const size = clamp(app.view.scale * 2600, 16, 34);
-    const showLabels = app.view.scale > 0.01;
-    ctx.font = "13px " + getComputedStyle(document.body).fontFamily; ctx.textAlign = "center";
+    drawMapImage(ctx, W2S);
+    const size = clamp(app.view.scale * 2600, 16, 34), showLabels = app.view.scale > .01;
+    ctx.font = "13px " + FONT(); ctx.textAlign = "center";
     for (const m of visible()) {
-      const [x, y] = W2S(m.x, m.y);
-      if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
+      const [x, y] = W2S(m.x, m.y); if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
       drawMarker(ctx, x, y, m, size);
-      if (showLabels && m.name && m.discovered) {
-        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.8)"; ctx.fillStyle = "#f2efe8";
-        ctx.strokeText(m.name, x, y + size * 0.5 + 13); ctx.fillText(m.name, x, y + size * 0.5 + 13);
-      }
+      if (showLabels && m.name && m.discovered) { ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.8)"; ctx.fillStyle = "#f2efe8"; ctx.strokeText(m.name, x, y + size * .5 + 13); ctx.fillText(m.name, x, y + size * .5 + 13); }
     }
-    if (s && !s.where.interior) drawFollowers(ctx, W2S, s);
-    if (s && app.shown && !s.where.interior) {
-      const [x, y] = W2S(app.shown.x, app.shown.y);
-      drawPlayer(ctx, x, y, app.shown.h, 13);
-    }
+    if (s && !s.where.interior) drawFollowers(ctx, W2S, s, t);
+    if (s && app.shown && !s.where.interior) { const [x, y] = W2S(app.shown.x, app.shown.y); drawPlayer(ctx, x, y, app.shown.h, 13); }
   }
   let drag = null;
-  world.addEventListener("mousedown", (e) => { drag = { x: e.clientX, y: e.clientY, vx: app.view.x, vy: app.view.y }; world.classList.add("dragging"); });
+  function setFollow(on) { app.follow = on; $("btnFollow").classList.toggle("on", on); }
+  world.addEventListener("mousedown", (e) => { drag = { x: e.clientX, y: e.clientY, vx: app.view.x, vy: app.view.y }; });
   window.addEventListener("mousemove", (e) => {
-    if (drag) {
-      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3 && app.follow) { app.follow = false; $("btnFollow").classList.remove("active"); }
-      if (!app.follow) { app.view.x = drag.vx - dx / app.view.scale; app.view.y = drag.vy + dy / app.view.scale; }
-    }
+    if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3 && app.follow) setFollow(false); if (!app.follow) { app.view.x = drag.vx - dx / app.view.scale; app.view.y = drag.vy + dy / app.view.scale; } }
     hoverTip(e);
   });
-  window.addEventListener("mouseup", () => { drag = null; world.classList.remove("dragging"); });
+  window.addEventListener("mouseup", () => { drag = null; });
   world.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    const r = world.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, [gx, gy] = S2W(mx, my);
-    app.view.scale = clamp(app.view.scale * Math.exp(-e.deltaY * 0.0015), 0.0006, 0.08);
+    e.preventDefault(); const r = world.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, [gx, gy] = S2W(mx, my);
+    app.view.scale = clamp(app.view.scale * Math.exp(-e.deltaY * .0015), .0006, .08);
     if (!app.follow) { const [nx, ny] = S2W(mx, my); app.view.x += gx - nx; app.view.y += gy - ny; }
   }, { passive: false });
   function hoverTip(e) {
@@ -599,107 +574,174 @@
     let best = null, bd = 14;
     for (const m of visible()) { const [x, y] = W2S(m.x, m.y), d = Math.hypot(x - mx, y - my); if (d < bd) { bd = d; best = m; } }
     if (!best) { tip.style.display = "none"; return; }
-    tip.textContent = (best.name || "Unknown") + (best.discovered ? "" : " (undiscovered)");
-    tip.style.left = (mx + 14) + "px"; tip.style.top = (my + 10) + "px"; tip.style.display = "block";
+    tip.textContent = (best.name || "Unknown") + (best.discovered ? "" : " (undiscovered)"); tip.style.left = (mx + 14) + "px"; tip.style.top = (my + 10) + "px"; tip.style.display = "block";
   }
-  $("btnFollow").onclick = () => { app.follow = !app.follow; $("btnFollow").classList.toggle("active", app.follow); };
-  $("btnFit").onclick = () => { app.follow = false; $("btnFollow").classList.remove("active"); fitWorld(); };
-  $("btnTrailClear").onclick = () => { app.trail = {}; store.set("trail", app.trail); };
-  function syncSpoil() { $("btnSpoil").textContent = "Undiscovered: " + (app.settings.spoilers ? "on" : "off"); $("btnSpoil").classList.toggle("active", app.settings.spoilers); }
+  $("btnFollow").onclick = () => setFollow(!app.follow);
+  $("btnFit").onclick = () => { setFollow(false); fitWorld(); };
+  function syncSpoil() { $("btnSpoil").classList.toggle("on", app.settings.spoilers); }
   $("btnSpoil").onclick = () => { app.settings.spoilers = !app.settings.spoilers; store.set("settings", app.settings); syncSpoil(); };
   syncSpoil();
 
-  // ---------- mini map ----------
+  // ---------- mini map: compass + radar, background cut from the map around you ----------
   const mini = $("miniMap"), mctx = mini.getContext("2d");
-  function drawMini() {
-    const w = mini.clientWidth, h = mini.clientHeight, ctx = mctx, s = app.state, R = Math.min(w, h) / 2 - 2;
+  const PAPER = "#d6c7a1";
+  function drawMini(t) {
+    const w = mini.clientWidth, h = mini.clientHeight, ctx = mctx, s = app.state, ringW = 22, R = Math.min(w, h) / 2 - ringW - 2;
     ctx.clearRect(0, 0, w, h);
+    const head = app.shown ? app.shown.h : 0, rot = -head * Math.PI / 180;
     ctx.save(); ctx.beginPath(); ctx.arc(w / 2, h / 2, R, 0, Math.PI * 2); ctx.clip();
-    ctx.fillStyle = "#161310"; ctx.fillRect(0, 0, w, h);
-    if (!s || !app.shown) { ctx.restore(); ring(ctx, w, h, R); return; }
-    const indoors = s.where.interior;
-    const pts = app.trail[trailKey(s)] || [];
-    let radius = 24000;
-    if (indoors) { radius = 600; for (const p of pts) if (p) radius = Math.max(radius, Math.hypot(p[0] - app.shown.x, p[1] - app.shown.y) + 200); radius = Math.min(radius, 6000); }
-    const scale = R / radius, rot = -app.shown.h * Math.PI / 180, cos = Math.cos(rot), sin = Math.sin(rot);
-    const toScreen = (x, y) => { const dx = (x - app.shown.x) * scale, dy = -(y - app.shown.y) * scale; return [dx * cos - dy * sin + w / 2, dx * sin + dy * cos + h / 2]; };
-    if (!indoors && app.mapInfo && app.mapImg && app.mapImg.ok) {
-      ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(rot);
-      const { span, cx, cy } = app.mapInfo, k = scale * span;
-      ctx.drawImage(app.mapImg.el, ((cx - span / 2) - app.shown.x) * scale, -((cy + span / 2) - app.shown.y) * scale, k, k);
-      ctx.restore();
-    }
-    strokeTrail(ctx, pts, toScreen, indoors ? "rgba(242,239,232,.8)" : "rgba(120,20,10,.9)", indoors ? 3 : 2.5);
-    if (!indoors) {
-      for (const m of visible()) {
-        if (Math.abs(m.x - app.shown.x) > radius * 1.5 || Math.abs(m.y - app.shown.y) > radius * 1.5) continue;
-        const [x, y] = toScreen(m.x, m.y); drawMarker(ctx, x, y, m, 22);
+    ctx.fillStyle = PAPER; ctx.fillRect(0, 0, w, h);
+    if (s && app.shown) {
+      const indoors = s.where.interior, radius = 9000, scale = R / radius, cos = Math.cos(rot), sin = Math.sin(rot);
+      const toScreen = (x, y) => { const dx = (x - app.shown.x) * scale, dy = -(y - app.shown.y) * scale; return [dx * cos - dy * sin + w / 2, dx * sin + dy * cos + h / 2]; };
+      if (!indoors && app.mapInfo && app.mapImg && app.mapImg.ok) {
+        ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(rot);
+        const { span, cx, cy } = app.mapInfo, k = scale * span;
+        ctx.globalAlpha = .75; ctx.drawImage(app.mapImg.el, ((cx - span / 2) - app.shown.x) * scale, -((cy + span / 2) - app.shown.y) * scale, k, k); ctx.restore();
       }
+      if (s.player.inCombat) { const g = ctx.createRadialGradient(w / 2, h / 2, R * .55, w / 2, h / 2, R); g.addColorStop(0, "rgba(194,58,38,0)"); g.addColorStop(1, `rgba(194,58,38,${.35 + .15 * Math.sin(t / 250)})`); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+      if (s.player.sneaking) { const g = ctx.createRadialGradient(w / 2, h / 2, R * .3, w / 2, h / 2, R); g.addColorStop(0, "rgba(16,20,26,0)"); g.addColorStop(1, "rgba(16,20,26,.7)"); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+      drawFollowers(ctx, toScreen, s, t);
     }
-    drawFollowers(ctx, toScreen, s);
     ctx.restore();
-    ring(ctx, w, h, R);
-    ctx.fillStyle = "#d8c08a"; ctx.font = "14px " + getComputedStyle(document.body).fontFamily; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("N", w / 2 + Math.sin(rot) * (R - 12), h / 2 - Math.cos(rot) * (R - 12)); ctx.textBaseline = "alphabetic";
-    drawPlayer(ctx, w / 2, h / 2, 0, 10);
-    $("miniTitle").textContent = indoors ? (s.where.cell || "Interior") + " · your path" : "";
-    $("miniInfo").textContent = Math.round(radius / 70) + " m";
-  }
-  function ring(ctx, w, h, R) { ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(w / 2, h / 2, R, 0, Math.PI * 2); ctx.stroke(); }
-
-  // ---------- compass ----------
-  function drawCompass(h) {
-    const strip = $("compassStrip"), wPx = strip.parentNode.clientWidth, pxPerDeg = 3.2;
-    let html = "";
-    const names = { 0: "N", 45: "NE", 90: "E", 135: "SE", 180: "S", 225: "SW", 270: "W", 315: "NW" };
-    for (let d = -360; d <= 720; d += 15) {
-      const off = (d - h) * pxPerDeg + wPx / 2;
-      if (off < -20 || off > wPx + 20) continue;
-      const n = ((d % 360) + 360) % 360;
-      html += `<span class="tick ${names[n] ? "card" : ""}" style="left:${off}px">${names[n] || "·"}</span>`;
+    // compass ring
+    ctx.strokeStyle = "#5a5e60"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(w / 2, h / 2, R + 1, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "#202325"; ctx.lineWidth = ringW; ctx.beginPath(); ctx.arc(w / 2, h / 2, R + ringW / 2 + 2, 0, Math.PI * 2); ctx.stroke();
+    ctx.font = "15px " + FONT(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const [l, a] of [["N", 0], ["E", 90], ["S", 180], ["W", 270]]) {
+      const ang = (a - head) * Math.PI / 180 - Math.PI / 2, rr = R + ringW / 2 + 2;
+      ctx.fillStyle = l === "N" ? "#ece8df" : "#9a968d"; ctx.fillText(l, w / 2 + Math.cos(ang) * rr, h / 2 + Math.sin(ang) * rr);
     }
-    strip.style.width = wPx + "px"; strip.innerHTML = html;
+    for (let a = 0; a < 360; a += 15) { if (a % 90 === 0) continue; const ang = (a - head) * Math.PI / 180 - Math.PI / 2; ctx.strokeStyle = "#4a4d4f"; ctx.lineWidth = 1.5; ctx.beginPath();
+      ctx.moveTo(w / 2 + Math.cos(ang) * (R + 7), h / 2 + Math.sin(ang) * (R + 7)); ctx.lineTo(w / 2 + Math.cos(ang) * (R + 12), h / 2 + Math.sin(ang) * (R + 12)); ctx.stroke(); }
+    ctx.textBaseline = "alphabetic";
+    drawPlayer(ctx, w / 2, h / 2, 0, 11);
   }
 
   // ---------- panels ----------
-  const fmtTime = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}h ${m}m` : m ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`; };
   const ordinal = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
-  function setBar(prefix, v) {
-    const pct = v && v.max > 0 ? clamp(v.cur / v.max, 0, 1) * 100 : 0;
-    $(prefix + "Fill").style.width = pct + "%";
-    $(prefix + "Text").textContent = v ? `${Math.round(v.cur)} / ${Math.round(v.max)}` : "—";
+  const fmtTime = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}h ${m}m` : m ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`; };
+
+  function renderCharacter(s) {
+    const p = s.player, st = s.stats;
+    $("charName").textContent = p.name || "—"; $("charLevel").textContent = p.level;
+    $("gold").textContent = p.gold.toLocaleString() + " gold";
+    const set = (id, v) => { $(id).textContent = v ? Math.round(v.cur) : "–"; $(id + "m").textContent = v ? "/ " + Math.round(v.max) : ""; };
+    set("vH", st.health); set("vM", st.magicka); set("vS", st.stamina);
+    $("vH").style.color = st.health && st.health.max > 0 && st.health.cur / st.health.max < .3 ? "#ff3b28" : "";
+    $("chipCombat").className = "chip" + (p.inCombat ? " on danger" : ""); $("chipSneak").className = "chip" + (p.sneaking ? " on" : ""); $("chipMount").className = "chip" + (p.mounted ? " on" : "");
   }
+
+  const MONTHS = ["Morning Star", "Sun's Dawn", "First Seed", "Rain's Hand", "Second Seed", "Midyear", "Sun's Height", "Last Seed", "Hearthfire", "Frostfall", "Sun's Dusk", "Evening Star"];
+  const MLEN = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const DAYS = ["Sundas", "Morndas", "Tirdas", "Middas", "Turdas", "Fredas", "Loredas"];
+  let calKey = "";
+  function renderHeaderAndCalendar(s) {
+    const wh = s.where;
+    $("whereBig").textContent = wh.interior ? (wh.cell || "Interior") : (wh.location || wh.worldspace || "Wilderness");
+    $("whereSmall").textContent = wh.interior ? (wh.location || "") : (wh.worldspace || "");
+    if (!s.time) return;
+    const tm = s.time;
+    $("when").textContent = `${tm.dayName}, ${ordinal(tm.day)} of ${tm.month}, 4E ${tm.year} · ${gameTime(s)}`;
+    const key = tm.month + tm.day + tm.year; if (key === calKey) return; calKey = key;
+    const mi = MONTHS.indexOf(tm.month), len = mi >= 0 ? MLEN[mi] : 30, wd = DAYS.indexOf(tm.dayName);
+    $("calMonth").textContent = tm.month; $("calYear").textContent = "4E " + tm.year;
+    if (wd < 0) { $("cal").innerHTML = ""; return; }
+    const first = ((wd - (tm.day - 1)) % 7 + 7) % 7;
+    let html = "<table><tr>" + ["Su", "Mo", "Ti", "Mi", "Tu", "Fr", "Lo"].map(d => `<th>${d}</th>`).join("") + "</tr><tr>";
+    for (let i = 0; i < first; i++) html += "<td></td>";
+    for (let d = 1; d <= len; d++) { const col = (first + d - 1) % 7; html += `<td class="${d === tm.day ? "today" : ""}">${d}</td>`; if (col === 6 && d < len) html += "</tr><tr>"; }
+    $("cal").innerHTML = html + "</tr></table>";
+  }
+
+  function renderParty(list) {
+    list = list || [];
+    $("partyCount").textContent = list.filter(f => !f.dead).length || "";
+    if (!list.length) { $("party").innerHTML = `<div class="empty">No one with you</div>`; return; }
+    const pct = (v) => v && v.max > 0 ? clamp(v.cur / v.max, 0, 1) * 100 : 0;
+    const order = { "Downed": 0, "In combat": 1, "Following": 2, "Away": 3, "Dead": 4 };
+    const sorted = list.slice().sort((a, b) => (order[a.status] ?? 5) - (order[b.status] ?? 5) || a.name.localeCompare(b.name));
+    $("party").innerHTML = sorted.map(f => {
+      const cls = f.status === "Downed" || f.status === "Dead" ? "bad" : f.status === "In combat" ? "warn" : "";
+      const dist = f.distance >= 0 ? Math.round(f.distance / 70) + " m away" : "";
+      const where = f.sameSpace ? dist : (f.interior ? (f.cell || "Interior") : (f.location || f.cell || "Elsewhere"));
+      const low = pct(f.health) < 30 && !f.dead;
+      return `<div class="pcard ${f.dead ? "dead" : ""}">
+        <div class="top"><span class="pdot" style="background:${followerColor(f.name)}"></span><span class="pname">${esc(f.name)}</span><span class="mute num" style="font-size:12px">${f.level}</span>
+        <span class="pst ${cls}">${esc(f.status)}${f.mounted ? " · mounted" : ""}</span></div>
+        <div class="mbars"><div class="bar"><i style="width:${pct(f.health)}%;background:${low ? "#ff3b28" : "var(--health)"}"></i></div>
+        <div class="bar"><i style="width:${pct(f.magicka)}%;background:var(--magicka)"></i></div><div class="bar"><i style="width:${pct(f.stamina)}%;background:var(--stamina)"></i></div></div>
+        ${where ? `<div class="pline">${esc(where)}</div>` : ""}</div>`;
+    }).join("");
+    fitList($("party"), "in party");
+  }
+
+  const HUNGER = ["Well Fed", "Satisfied", "Peckish", "Hungry", "Famished", "Starving"];
+  const COLD = ["Warm", "Comfortable", "Chilly", "Very Cold", "Freezing", "Numb"];
+  const FATIGUE = ["Well Rested", "Rested", "Slightly Tired", "Tired", "Weary", "Debilitated"];
+  function stageFrom(n) { if (n.stage >= 0) return Math.round(n.stage); let st = 0; (n.thresholds || []).forEach((t, i) => { if (t > 0 && n.value >= t) st = i + 1; }); return st; }
+  function renderSurvival(sv) {
+    const el = $("survival");
+    if (!sv || sv.enabled === 0 || !(sv.hunger || sv.cold || sv.fatigue)) { el.innerHTML = `<div class="empty">${sv && sv.enabled === 0 ? "Survival Mode is off" : "Survival Mode not detected"}</div>`; $("ambient").textContent = ""; return; }
+    const rows = [["hunger", HUNGER, "var(--hunger)"], ["cold", COLD, "var(--frost)"], ["fatigue", FATIGUE, "var(--fatigue)"]];
+    el.innerHTML = rows.filter(([k]) => sv[k]).map(([k, names, color]) => {
+      const n = sv[k], max = n.max > 0 ? n.max : 1000, pct = clamp(n.value / max, 0, 1) * 100, st = stageFrom(n);
+      const ticks = (n.thresholds || []).filter(t => t > 0 && t < max).map(t => `<span class="tk" style="left:${t / max * 100}%"></span>`).join("");
+      return `<span>${esc(n.name)}</span><div class="bar" style="height:7px"><i style="width:${pct}%;background:${color}"></i>${ticks}</div>
+        <div class="st" style="${st >= 3 ? "color:var(--bad)" : ""}">${esc(names[st] || "")} <span class="mute num">${Math.round(n.value)} / ${Math.round(max)}</span></div>`;
+    }).join("");
+    $("ambient").textContent = sv.ambientCold >= 0 ? "Area cold " + Math.round(sv.ambientCold) : "";
+  }
+
+  const SLOT_ORDER = ["head", "body", "hands", "forearms", "feet", "calves", "shield", "amulet", "ring"];
+  const SLOT_NAME = { head: "Head", body: "Body", hands: "Hands", forearms: "Arms", feet: "Feet", calves: "Legs", shield: "Shield", amulet: "Neck", ring: "Ring" };
+  function renderEquipment(eq) {
+    if (!eq) return;
+    $("armorRating").textContent = "Armor " + Math.round(eq.armorRating ?? 0);
+    const r = eq.resists || {};
+    $("resists").textContent = "Resist  " + [["Fire", r.fire], ["Frost", r.frost], ["Shock", r.shock], ["Magic", r.magic], ["Poison", r.poison]].map(([n, v]) => `${n} ${Math.round(v || 0)}%`).join(" · ");
+    if (eq.carry) {
+      const over = eq.carry.cur > eq.carry.max, txt = `${Math.round(eq.carry.cur)} / ${Math.round(eq.carry.max)}`;
+      $("carryText").textContent = txt; $("carryTop").textContent = "Carry " + txt;
+      $("carryFill").style.width = clamp(eq.carry.cur / (eq.carry.max || 1), 0, 1) * 100 + "%";
+      $("carryFill").style.background = over ? "var(--bad)" : eq.carry.cur / eq.carry.max > .9 ? "var(--gold)" : "var(--fg-dim)";
+      $("carryText").className = "r num " + (over ? "red" : "dim");
+    }
+    const row = (slot, name, right) => `<div class="row"><span class="slot">${esc(slot)}</span><span class="nm">${name}</span><span class="r num">${right ?? ""}</span></div>`;
+    const hand = (h, label) => {
+      if (!h) return "";
+      let right = "", extra = "";
+      if (h.kind === "weapon") { right = h.damage ? Math.round(h.damage) + " dmg" : ""; if (typeof h.charge === "number") extra = ` <span class="mute">${Math.round(h.charge)}%</span>`; }
+      else if (h.kind === "spell") right = `<span class="mute">spell</span>`;
+      else if (h.kind === "shield") right = Math.round(h.armor);
+      const ench = h.enchant ? ` <span class="mute">· ${esc(h.enchant)}</span>` : "";
+      return row(label, esc(h.name) + ench + extra, right);
+    };
+    let html = hand(eq.right, "Right") + hand(eq.left, "Left");
+    if (eq.ammo) html += row("Ammo", esc(eq.ammo.name), `<span class="${eq.ammo.count < 10 ? "red" : ""}">${eq.ammo.count}</span>`);
+    if (eq.power) html += row(eq.power.shout ? "Shout" : "Power", esc(eq.power.name), "");
+    $("hands").innerHTML = html || `<div class="empty">Nothing in hand</div>`;
+    const worn = (eq.worn || []).slice().sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
+    $("worn").innerHTML = worn.map(a => row(SLOT_NAME[a.slot] || a.slot, esc(a.name) + (a.enchant ? ` <span class="mute">· ${esc(a.enchant)}</span>` : ""), a.armor ? Math.round(a.armor) : "")).join("") || `<div class="empty">No armor</div>`;
+  }
+
   const SPELLTYPE = { 0: "Spell", 1: "Disease", 2: "Power", 3: "Lesser power", 4: "Ability", 5: "Poison", 6: "Enchantment", 7: "Potion", 8: "Ingredient", 10: "Addiction", 11: "Shout", 12: "Staff", 13: "Scroll" };
   function effectSource(e) {
-    const kind = SPELLTYPE[e.spellType] || "";
-    const parts = [];
-    if (e.spellType === 6 && e.item) parts.push(e.item);
-    else if (e.spell && e.spell !== e.name) parts.push(e.spell);
-    else if (e.item) parts.push(e.item);
+    const kind = SPELLTYPE[e.spellType] || "", parts = [];
+    if (e.spellType === 6 && e.item) parts.push(e.item); else if (e.spell && e.spell !== e.name) parts.push(e.spell); else if (e.item) parts.push(e.item);
     let txt = kind ? kind + (parts.length ? ": " + parts.join(", ") : "") : parts.join(", ");
     if (e.caster && e.caster !== "You") txt += (txt ? " · " : "") + "from " + e.caster;
     return txt;
   }
-  function fillDesc(e) {
-    if (!e.desc) return "";
-    return e.desc.replace(/<mag>/gi, Math.round(e.mag)).replace(/<dur>/gi, Math.round(e.dur)).replace(/<[^>]+>/g, "");
-  }
-  // The game's own Active Effects menu skips inactive and hidden effects; do the same unless "hidden" is ticked.
-  // Permanent abilities (racial powers, perk and mod helpers) go in a collapsible group so buffs stay on top.
-  let abilitiesOpen = store.get("abilitiesOpen", false);
   function effectRow(e) {
-    const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed, pct = timed ? clamp(left / e.dur, 0, 1) * 100 : 100;
-    const desc = fillDesc(e);
-    return `<div class="row ${e.detrimental ? "bad" : ""} ${e.inactive ? "inactive" : ""}" title="${esc(desc)}">
-      ${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
-      <div style="min-width:0"><div class="name">${esc(e.name)}</div><div class="sub">${esc(effectSource(e))}</div>${timed ? `<div class="tbar"><i style="width:${pct}%"></i></div>` : ""}</div>
-      <div class="right">${timed ? fmtTime(left) : '<span class="dim">—</span>'}${e.mag ? `<div class="sub">${Math.round(e.mag)}</div>` : ""}</div>
-    </div>`;
+    const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed;
+    return `<div class="eff ${e.detrimental ? "bad" : ""}">${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
+      <span class="nm">${esc(e.name)}${e.mag ? ` <span class="dim num">${Math.round(e.mag)}</span>` : ""}</span><span class="num dim">${timed ? fmtTime(left) : ""}</span>
+      <span class="src">${esc(effectSource(e))}</span></div>`;
   }
   function renderEffects(list) {
     const el = $("effects");
-    const all = (list || []).filter(e => e.name && (app.settings.hidden || (!e.hidden && !e.inactive)));
-    // Same effect from the same source listed once.
+    const all = (list || []).filter(e => e.name && !e.hidden && !e.inactive);
     const seen = new Set(), shown = [];
     for (const e of all) { const k = e.name + "|" + e.spell + "|" + e.item; if (!seen.has(k)) { seen.add(k); shown.push(e); } }
     const isAbility = (e) => e.spellType === 4 && !(e.dur > 1) && !e.detrimental;
@@ -707,246 +749,111 @@
     main.sort((a, b) => (b.detrimental - a.detrimental) || ((a.dur > 1 ? a.dur - a.elapsed : 1e9) - (b.dur > 1 ? b.dur - b.elapsed : 1e9)) || a.name.localeCompare(b.name));
     abil.sort((a, b) => a.name.localeCompare(b.name));
     let html = main.length ? main.map(effectRow).join("") : `<div class="empty">No active effects</div>`;
-    if (abil.length) {
-      html += `<div class="group-h" id="abilToggle" style="cursor:pointer;margin-top:10px">${abilitiesOpen ? "▾" : "▸"} Abilities · ${abil.length}</div>`;
-      if (abilitiesOpen) html += abil.map(effectRow).join("");
-    }
-    el.innerHTML = html;
-    fitList(el, "effects");
-    const t = $("abilToggle");
-    if (t) t.onclick = () => { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); renderEffects(list); };
+    if (abil.length) { html += `<div class="grp" id="abilToggle" style="cursor:pointer;margin-top:6px">${abilitiesOpen ? "▾" : "▸"} Abilities · ${abil.length}</div>`; if (abilitiesOpen) html += abil.map(effectRow).join(""); }
+    el.innerHTML = html; fitList(el, "effects");
+    const t = $("abilToggle"); if (t) t.onclick = () => { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); renderEffects(list); };
   }
 
-  const HUNGER = ["Well Fed", "Satisfied", "Peckish", "Hungry", "Famished", "Starving"];
-  const COLD = ["Warm", "Comfortable", "Chilly", "Very Cold", "Freezing", "Numb"];
-  const FATIGUE = ["Well Rested", "Rested", "Slightly Tired", "Tired", "Weary", "Debilitated"];
-  function stageFrom(n) {
-    if (n.stage >= 0) return Math.round(n.stage);
-    let st = 0; (n.thresholds || []).forEach((t, i) => { if (t > 0 && n.value >= t) st = i + 1; }); return st;
+  // ---------- supplies ----------
+  function mainEffect(p) { let best = null; for (const e of p.effects || []) if (!best || e.mag * Math.max(1, e.dur) > best.mag * Math.max(1, best.dur)) best = e; return best; }
+  // Instant restore potions (what Smart Optimal Salves picks from). Exclusions from its INI come later.
+  function restoreKind(p) {
+    if (p.kind !== "potion") return null;
+    const e = mainEffect(p); if (!e || e.detrimental || e.recover || e.dur > 1) return null;
+    return e.av === 24 ? "h" : e.av === 25 ? "m" : e.av === 26 ? "s" : null;
   }
-  function renderSurvival(sv) {
-    const el = $("survival");
-    if (!sv || sv.enabled === 0 || !(sv.hunger || sv.cold || sv.fatigue)) {
-      el.innerHTML = `<div class="empty">${sv && sv.enabled === 0 ? "Survival Mode is off" : "Survival Mode not detected"}</div>`; $("ambient").textContent = ""; return;
-    }
-    const rows = [["hunger", HUNGER, "var(--hunger)"], ["cold", COLD, "var(--cold)"], ["fatigue", FATIGUE, "var(--fatigue)"]];
-    el.innerHTML = rows.filter(([k]) => sv[k]).map(([k, names, color]) => {
-      const n = sv[k], max = n.max > 0 ? n.max : 1000, pct = clamp(n.value / max, 0, 1) * 100, st = stageFrom(n);
-      const ticks = (n.thresholds || []).filter(t => t > 0 && t < max).map(t => `<i style="left:${t / max * 100}%"></i>`).join("");
-      return `<div class="bar"><div class="bar-top"><span>${esc(n.name)}</span><b class="stage" style="color:${st >= 3 ? "var(--bad)" : "var(--ink)"}">${esc(names[st] || "")}</b></div>
-        <div class="track"><div class="fill" style="width:${pct}%;background:${color}"></div><div class="ticks">${ticks}</div></div></div>`;
-    }).join("");
-    $("ambient").textContent = sv.ambientCold >= 0 ? "Area cold " + Math.round(sv.ambientCold) : "";
-  }
-
-  const SLOT_ORDER = ["head", "body", "hands", "forearms", "feet", "calves", "shield", "amulet", "ring"];
-  const SLOT_NAME = { head: "Head", body: "Body", hands: "Hands", forearms: "Forearms", feet: "Feet", calves: "Calves", shield: "Shield", amulet: "Neck", ring: "Ring" };
-  function renderEquipment(eq) {
-    if (!eq) return;
-    $("armorRating").textContent = Math.round(eq.armorRating ?? 0);
-    const r = eq.resists || {};
-    $("resists").innerHTML = [["Fire", r.fire], ["Frost", r.frost], ["Shock", r.shock], ["Magic", r.magic], ["Poison", r.poison], ["Disease", r.disease]]
-      .map(([n, v]) => `<span>${n}<b>${Math.round(v || 0)}%</b></span>`).join("");
-    if (eq.carry) { setBar("carry", eq.carry); $("carryFill").style.background = eq.carry.cur > eq.carry.max ? "var(--bad)" : "var(--gold)"; }
-
-    const rows = [];
-    const hand = (h, label) => {
-      if (!h) return;
-      let ico, sub = label;
-      if (h.kind === "weapon") { ico = iconHtml("items/" + (WEAPON_ICON[h.weaponType] || "default_weapon") + ".png"); if (h.damage) sub += ` · ${h.damage} dmg`; }
-      else if (h.kind === "spell") { const e = (h.effects || [])[0]; ico = iconHtml("effects/" + (e ? effectIcon(e).base : "default_effect") + ".png"); sub += " · spell"; }
-      else if (h.kind === "shield") { ico = iconHtml("items/armor_shield.png"); sub += ` · ${Math.round(h.armor)} armor`; }
-      else ico = iconHtml("items/default_misc.png");
-      if (h.enchant) sub += " · " + h.enchant;
-      const charge = typeof h.charge === "number" ? `<div class="sub">${Math.round(h.charge)}%</div>` : "";
-      rows.push(`<div class="row">${ico}<div style="min-width:0"><div class="name">${esc(h.name)}</div><div class="sub">${esc(sub)}</div></div><div class="right">${charge}</div></div>`);
-    };
-    hand(eq.right, "Right hand"); hand(eq.left, "Left hand");
-    if (eq.ammo) rows.push(`<div class="row">${iconHtml("items/" + (eq.ammo.bolt ? "weapon_bolt" : "weapon_arrow") + ".png")}<div style="min-width:0"><div class="name">${esc(eq.ammo.name)}</div><div class="sub">Ammo</div></div><div class="right count ${eq.ammo.count < 10 ? "low" : ""}">${eq.ammo.count}</div></div>`);
-    if (eq.power) rows.push(`<div class="row">${iconHtml("effects/" + (eq.power.shout ? "av_skill_shout" : "default_effect") + ".png")}<div style="min-width:0"><div class="name">${esc(eq.power.name)}</div><div class="sub">${eq.power.shout ? "Shout" : "Power"}</div></div><div class="right"></div></div>`);
-    const worn = (eq.worn || []).slice().sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
-    for (const a of worn) {
-      const sub = SLOT_NAME[a.slot] + (a.weight !== "clothing" && a.weight !== "jewelry" ? " · " + a.weight : "") + (a.enchant ? " · " + a.enchant : "");
-      rows.push(`<div class="row">${iconHtml("items/" + armorIcon(a.slot, a.weight) + ".png")}<div style="min-width:0"><div class="name">${esc(a.name)}</div><div class="sub">${esc(sub)}</div></div><div class="right">${a.armor ? Math.round(a.armor) : ""}</div></div>`);
-    }
-    $("equipment").innerHTML = rows.length ? rows.join("") : `<div class="empty">Nothing equipped</div>`;
-    fitList($("equipment"), "items");
-  }
-
-  function mainEffect(p) {
-    let best = null;
-    for (const e of p.effects || []) if (!best || e.mag * Math.max(1, e.dur) > best.mag * Math.max(1, best.dur)) best = e;
-    return best;
-  }
-  function consGroup(p) {
-    if (p.kind === "poison") return "Poisons";
-    if (p.kind === "food") return "Food & Drink";
-    const e = mainEffect(p);
-    if (!e) return "Other potions";
-    if (e.archetype === 3 || e.archetype === 29) return "Cures";
-    if (!e.detrimental && !e.recover) {
-      if (e.av === 24) return "Restore Health";
-      if (e.av === 25) return "Restore Magicka";
-      if (e.av === 26) return "Restore Stamina";
-    }
-    if ([27, 28, 29, 155, 156, 157].includes(e.av)) return "Regeneration";
-    if (e.av >= 40 && e.av <= 45) return "Resistances";
-    if (e.recover) return "Fortify";
-    return "Other potions";
-  }
-  const GROUP_ORDER = ["Restore Health", "Restore Magicka", "Restore Stamina", "Regeneration", "Cures", "Resistances", "Fortify", "Other potions", "Food & Drink", "Poisons"];
+  const isCure = (p) => (p.effects || []).some(e => e.archetype === 3 || /cure disease/i.test(e.name));
+  const isSkooma = (p) => /skooma/i.test(p.name);
   function renderConsumables(list) {
-    const el = $("consumables");
-    if (!list || !list.length) { el.innerHTML = `<div class="empty">No potions, food or poisons</div>`; $("consTotal").textContent = ""; $("consSummary").innerHTML = ""; return; }
-    const groups = new Map();
-    for (const p of list) { const g = consGroup(p); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(p); }
-    let html = "", total = 0;
-    for (const g of GROUP_ORDER) {
-      const items = groups.get(g); if (!items) continue;
-      const sum = items.reduce((a, b) => a + b.count, 0); total += sum;
-      items.sort((a, b) => (mainEffect(b)?.mag || 0) - (mainEffect(a)?.mag || 0) || b.count - a.count);
-      html += `<div class="group-h">${esc(g)} · ${sum}</div>`;
-      html += items.map(p => {
-        const e = mainEffect(p);
-        const sub = e ? `${e.name}${e.mag ? " " + Math.round(e.mag) : ""}${e.dur ? " for " + e.dur + "s" : ""}` + ((p.effects || []).length > 1 ? ` +${p.effects.length - 1}` : "") : "";
-        return `<div class="row">${iconHtml("items/" + potionIcon(p) + ".png")}<div style="min-width:0"><div class="name">${esc(p.name)}</div><div class="sub">${esc(sub)}</div></div><div class="right count ${p.count <= 2 && g.startsWith("Restore") ? "low" : ""}">${p.count}</div></div>`;
-      }).join("");
+    const el = $("consumables"); list = list || [];
+    const tot = { h: [0, 0], m: [0, 0], s: [0, 0] };
+    let cure = 0, skooma = 0, food = 0, poison = 0, other = 0;
+    for (const p of list) {
+      const k = restoreKind(p);
+      if (k) { tot[k][0] += p.count; tot[k][1] += p.count * (mainEffect(p)?.mag || 0); continue; }
+      if (isSkooma(p)) { skooma += p.count; continue; }
+      if (isCure(p)) { cure += p.count; continue; }
+      if (p.kind === "food") food += p.count; else if (p.kind === "poison") poison += p.count; else other += p.count;
     }
-    el.innerHTML = html; $("consTotal").textContent = total + " total";
-    // Always-visible counts for the three potions that matter mid-fight.
-    const cnt = (g) => (groups.get(g) || []).reduce((a, b) => a + b.count, 0);
-    $("consSummary").innerHTML = [["Health", "Restore Health"], ["Magicka", "Restore Magicka"], ["Stamina", "Restore Stamina"]]
-      .map(([n, g]) => { const c = cnt(g); return `<span>${n} <b class="${c <= 2 ? "low" : ""}">${c}</b></span>`; }).join("");
-    fitList(el, "items");
-  }
-
-  function renderParty(list) {
-    const panel = $("partyPanel");
-    if (!list || !list.length) { panel.style.display = "none"; return; }
-    panel.style.display = "";
-    $("partyCount").textContent = list.filter(f => !f.dead).length + " with you";
-    const pct = (v) => v && v.max > 0 ? clamp(v.cur / v.max, 0, 1) * 100 : 0;
-    const order = { "Downed": 0, "In combat": 1, "Following": 2, "Away": 3, "Dead": 4 };
-    const sorted = list.slice().sort((a, b) => (order[a.status] ?? 5) - (order[b.status] ?? 5) || a.name.localeCompare(b.name));
-    $("party").innerHTML = sorted.map(f => {
-      const cls = f.status === "Downed" || f.status === "Dead" ? "bad" : f.status === "In combat" ? "warn" : "";
-      const dist = f.distance >= 0 ? Math.round(f.distance / 70) + " m" : "";
-      const where = f.sameSpace ? (dist ? dist + " away" : "") : (f.interior ? (f.cell || "Interior") : (f.location || f.cell || "Elsewhere"));
-      const lowHp = pct(f.health) < 30 && !f.dead;
-      return `<div class="member ${f.dead ? "dead" : ""}">
-        <div class="top"><span class="nm">${esc(f.name)} <span class="dim" style="font-size:12px">${f.level}</span></span><span class="st ${cls}">${esc(f.status)}${f.mounted ? " · mounted" : ""}</span></div>
-        <div class="mbars"><i><b style="width:${pct(f.health)}%;background:${lowHp ? "#ff5a4a" : "var(--health)"}"></b></i><i><b style="width:${pct(f.magicka)}%;background:var(--magicka)"></b></i><i><b style="width:${pct(f.stamina)}%;background:var(--stamina)"></b></i></div>
-        ${where ? `<div class="where">${esc(where)}</div>` : ""}
-      </div>`;
-    }).join("");
-    fitList($("party"), "followers");
+    const r = (key, name, c, total, cls) => `<div class="cons"><span>${key ? `<span class="key">${key}</span>` : ""}</span><span>${name}</span><span class="cnt num ${cls || ""}">${c}</span><span class="num dim" style="font-size:12px">${total || ""}</span></div>`;
+    el.innerHTML =
+      r("V", "Health", tot.h[0], tot.h[1] ? "+" + Math.round(tot.h[1]) : "", tot.h[0] <= 2 ? "red" : "") +
+      r("B", "Magicka", tot.m[0], tot.m[1] ? "+" + Math.round(tot.m[1]) : "", tot.m[0] <= 2 ? "red" : "") +
+      r("N", "Stamina", tot.s[0], tot.s[1] ? "+" + Math.round(tot.s[1]) : "", tot.s[0] <= 2 ? "red" : "") +
+      `<div class="rule"></div>` + r("", "Cure Disease", cure) + r("", "Skooma", skooma, "", skooma > 0 ? "red" : "") +
+      `<div class="rule"></div>` + r("", "Food", food) + r("", "Poisons", poison) + r("", "Other potions", other);
   }
 
   let lastSlow = 0;
   function renderPanels(s) {
-    const p = s.player;
-    setBar("hp", s.stats.health); setBar("mp", s.stats.magicka); setBar("sp", s.stats.stamina);
-    $("charLevel").textContent = (p.name ? p.name + " · " : "") + "Level " + p.level;
-    $("chipCombat").className = "chip" + (p.inCombat ? " on danger" : "");
-    $("chipSneak").className = "chip" + (p.sneaking ? " on" : "");
-    $("chipMount").className = "chip" + (p.mounted ? " on" : "");
-    $("gold").textContent = p.gold.toLocaleString() + " gold";
-    if (s.time) {
-      const hr = s.time.hour, H = Math.floor(hr), M = Math.floor((hr - H) * 60);
-      $("clockT").textContent = ((H + 11) % 12 + 1) + ":" + String(M).padStart(2, "0") + (H < 12 ? " AM" : " PM");
-      $("clockD").textContent = `${s.time.dayName}, ${ordinal(s.time.day)} of ${s.time.month}, 4E ${s.time.year}`;
-    }
-    const wh = s.where;
-    $("whereBig").textContent = wh.interior ? (wh.cell || "Interior") : (wh.location || wh.worldspace || "Wilderness");
-    $("whereSmall").textContent = wh.interior ? (wh.location || "") : (wh.worldspace || "");
-    renderParty(s.followers);
-    renderEffects(s.effects);
-    renderSurvival(s.survival);
-    // Inventory-based panels change slowly; don't rebuild them on every update.
+    renderCharacter(s); renderHeaderAndCalendar(s); renderParty(s.followers); renderEffects(s.effects); renderSurvival(s.survival);
     if (Date.now() - lastSlow > 900) { lastSlow = Date.now(); renderEquipment(s.equipment); renderConsumables(s.consumables); }
   }
-  window.addEventListener("resize", () => { lastSlow = 0; if (app.state) renderPanels(app.state); });
-  $("setHidden").checked = !!app.settings.hidden;
-  $("setHidden").onchange = () => { app.settings.hidden = $("setHidden").checked; store.set("settings", app.settings); if (app.state) renderEffects(app.state.effects); };
+  window.addEventListener("resize", () => { lastSlow = 0; if (app.state) renderPanels(app.state); renderEvents(); });
 
-  // ---------- demo ----------
+  // ---------- settings page ----------
+  function openSettings() {
+    $("sheetBody").innerHTML = `<div class="grp">Hotkeys in game</div>` +
+      [["Num +", "Zoom in"], ["Num −", "Zoom out"], ["Num *", "Change map view"], ["Num .", "Show undiscovered markers"], ["Num /", "Show abilities"], ["V", "Health potion (Smart Optimal Salves)"], ["B", "Magicka potion"], ["N", "Stamina potion"]]
+        .map(k => `<div class="row2"><span class="key">${k[0]}</span><span>${k[1]}</span></div>`).join("") +
+      `<div class="grp" style="margin-top:12px">Coming in later builds</div><div class="dim" style="font-size:13px">Party slots, opponent focus, layout editor, hidden effects, log folder.</div>`;
+    $("sheet").classList.add("open"); $("tabSettings").classList.add("on"); $("tabHub").classList.remove("on");
+  }
+  function closeSheet() { $("sheet").classList.remove("open"); $("tabSettings").classList.remove("on"); $("tabHub").classList.add("on"); }
+  $("tabSettings").onclick = openSettings; $("tabHub").onclick = closeSheet; $("sheetClose").onclick = closeSheet;
+  $("sheet").onclick = (e) => { if (e.target === $("sheet")) closeSheet(); };
+
+  // ---------- demo (open with ?demo) ----------
   function startDemo() {
     app.demo = true; $("banner").style.display = "none";
     let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const types = [1, 2, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 15, 17, 20, 21, 25, 27, 28, 29];
-    const markers = [];
-    for (let i = 0; i < 120; i++) { const t = types[Math.floor(rnd() * types.length)]; markers.push({ ref: "", name: "Demo place " + (i + 1), x: (rnd() - 0.45) * 380000, y: (rnd() - 0.5) * 200000 - 10000, type: t, seen: rnd() > 0.15, discovered: rnd() > 0.4 }); }
+    const markers = []; for (let i = 0; i < 120; i++) markers.push({ ref: "", name: "Demo place " + (i + 1), x: (rnd() - .45) * 380000, y: (rnd() - .5) * 200000 - 10000, type: types[Math.floor(rnd() * types.length)], seen: rnd() > .15, discovered: rnd() > .4 });
     onMarkers({ markers });
     let t = 0;
     setInterval(() => {
-      t += 0.002;
-      const x = Math.cos(t) * 70000 + 10000, y = Math.sin(t) * 40000 + 5000;
-      const heading = (Math.atan2(-Math.sin(t) * 70000, Math.cos(t) * 40000) * 180 / Math.PI + 360) % 360;
-      onState({
-        ready: true,
-        player: { name: "Demo", level: 31, x, y, z: 0, heading, gold: 4210, inCombat: Math.sin(t * 9) > 0.85, sneaking: Math.sin(t * 5) > 0.6, mounted: false },
+      t += .002; const x = Math.cos(t) * 70000 + 10000, y = Math.sin(t) * 40000 + 5000, heading = (Math.atan2(-Math.sin(t) * 70000, Math.cos(t) * 40000) * 180 / Math.PI + 360) % 360;
+      const fight = Math.sin(t * 9) > .85;
+      onState({ ready: true,
+        player: { name: "Demo", level: 31, x, y, z: 0, heading, gold: 4210, inCombat: fight, sneaking: Math.sin(t * 5) > .6, mounted: false },
         stats: { health: { cur: 380 + 60 * Math.sin(t * 20), max: 440 }, magicka: { cur: 290, max: 360 }, stamina: { cur: 150, max: 240 } },
         where: { worldspaceId: 60, worldspace: "Skyrim", worldspaceEdid: "Tamriel", cell: "", interior: false, location: "Whiterun Hold" },
         time: { hour: (9 + t * 40) % 24, day: 17, dayName: "Morndas", month: "Last Seed", year: 201 },
         followers: [
-          { name: "Lydia", level: 28, health: { cur: 310, max: 420 }, magicka: { cur: 50, max: 50 }, stamina: { cur: 200, max: 260 }, status: Math.sin(t * 9) > 0.85 ? "In combat" : "Following", dead: false, loaded: true, mounted: false, sameSpace: true, distance: 420, x: x - 300, y: y - 250, worldspaceId: 60, interior: false, cell: "", location: "Whiterun Hold" },
-          { name: "Meeko", level: 10, health: { cur: 40, max: 160 }, magicka: { cur: 0, max: 0 }, stamina: { cur: 80, max: 100 }, status: "Following", dead: false, loaded: true, mounted: false, sameSpace: true, distance: 180, x: x + 150, y: y - 80, worldspaceId: 60, interior: false, cell: "", location: "Whiterun Hold" },
-          { name: "Serana", level: 31, health: { cur: 380, max: 380 }, magicka: { cur: 300, max: 300 }, stamina: { cur: 200, max: 200 }, status: "Away", dead: false, loaded: false, mounted: false, sameSpace: false, distance: -1, x: 0, y: 0, worldspaceId: 0, interior: true, cell: "Breezehome", location: "Whiterun" }
-        ],
+          { name: "Lydia", level: 28, health: { cur: Math.sin(t * 7) > .9 ? 5 : 310, max: 420 }, magicka: { cur: 50, max: 50 }, stamina: { cur: 200, max: 260 }, status: Math.sin(t * 7) > .9 ? "Downed" : fight ? "In combat" : "Following", dead: false, mounted: false, sameSpace: true, distance: 420, x: x - 300, y: y - 250, worldspaceId: 60, interior: false, cell: "", location: "Whiterun Hold" },
+          { name: "Meeko", level: 10, health: { cur: 40, max: 160 }, magicka: { cur: 0, max: 0 }, stamina: { cur: 80, max: 100 }, status: "Following", dead: false, mounted: false, sameSpace: true, distance: 180, x: x + 150, y: y - 80, worldspaceId: 60, interior: false, cell: "", location: "Whiterun Hold" },
+          { name: "Serana", level: 31, health: { cur: 380, max: 380 }, magicka: { cur: 300, max: 300 }, stamina: { cur: 200, max: 200 }, status: "Away", dead: false, mounted: false, sameSpace: false, distance: -1, x: 0, y: 0, worldspaceId: 0, interior: true, cell: "Breezehome", location: "Whiterun" }],
         effects: [
-          { name: "Fortify Destruction", desc: "Destruction spells are <mag>% stronger for <dur> seconds.", spell: "Potion of the Warlock", spellType: 7, item: "", caster: "You", mag: 25, dur: 60, elapsed: (t * 900) % 60, archetype: 0, av: 20, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
-          { name: "Fortify Health", desc: "Health is increased by <mag> points.", spell: "Ring of Health", spellType: 6, item: "Ring of Health", caster: "You", mag: 40, dur: 0, elapsed: 0, archetype: 0, av: 24, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
-          { name: "Frostbite", desc: "", spell: "Frostbite", spellType: 0, item: "", caster: "Ice Wraith", mag: 8, dur: 5, elapsed: (t * 900) % 5, archetype: 0, av: 24, resist: 43, detrimental: true, recover: false, hidden: false, inactive: false },
-          { name: "Oakflesh", desc: "Improves the caster's armor rating by <mag> points for <dur> seconds.", spell: "Oakflesh", spellType: 0, item: "", caster: "You", mag: 40, dur: 60, elapsed: (t * 400) % 60, archetype: 0, av: 39, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
-          { name: "Breton Magic Resistance", desc: "", spell: "Magic Resistance", spellType: 4, item: "", caster: "You", mag: 25, dur: 0, elapsed: 0, archetype: 0, av: 44, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false }
-        ],
+          { name: "Fortify Destruction", spell: "Potion of the Warlock", spellType: 7, item: "", caster: "You", mag: 25, dur: 60, elapsed: (t * 900) % 60, archetype: 0, av: 20, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
+          { name: "Frostbite", spell: "Frostbite", spellType: 0, item: "", caster: "Ice Wraith", mag: 8, dur: 5, elapsed: (t * 900) % 5, archetype: 0, av: 24, resist: 43, detrimental: true, recover: false, hidden: false, inactive: false },
+          { name: "Breton Magic Resistance", spell: "Magic Resistance", spellType: 4, item: "", caster: "You", mag: 25, dur: 0, elapsed: 0, archetype: 0, av: 44, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false }],
         survival: { enabled: 1, ambientCold: 120, hunger: { name: "Hunger", value: (t * 3000) % 600, max: 600, stage: -1, thresholds: [60, 160, 240, 360, 480] }, cold: { name: "Cold", value: 210, max: 1000, stage: -1, thresholds: [100, 200, 400, 600, 800] }, fatigue: { name: "Fatigue", value: 130, max: 600, stage: -1, thresholds: [60, 120, 240, 360, 480] } },
-        equipment: {
-          right: { name: "Staff of Firebolts", kind: "weapon", weaponType: 8, damage: 0, enchant: "Firebolt", charge: 72 },
-          left: { name: "Fast Healing", kind: "spell", effects: [{ name: "Restore Health", archetype: 0, av: 24, detrimental: false, recover: false }] },
-          ammo: { name: "Iron Arrow", count: 7, bolt: false }, power: { name: "Unrelenting Force", shout: true },
-          worn: [{ slot: "head", name: "Hooded Mage Robes Cowl", armor: 0, weight: "clothing", enchant: "Fortify Magicka" }, { slot: "body", name: "Robes of Destruction", armor: 0, weight: "clothing", enchant: "Fortify Destruction" },
-            { slot: "hands", name: "Elven Gauntlets", armor: 9, weight: "light", enchant: "" }, { slot: "feet", name: "Elven Boots", armor: 9, weight: "light", enchant: "" },
-            { slot: "amulet", name: "Amulet of Julianos", armor: 0, weight: "jewelry", enchant: "Fortify Magicka" }, { slot: "ring", name: "Ring of Health", armor: 0, weight: "jewelry", enchant: "Fortify Health" }],
-          armorRating: 104, carry: { cur: 212, max: 300 }, resists: { fire: 0, frost: 15, shock: 0, magic: 25, poison: 0, disease: 0 }
-        },
+        equipment: { right: { name: "Steel Sword", kind: "weapon", weaponType: 1, damage: 11, enchant: "" }, left: { name: "Flames", kind: "spell", effects: [] }, ammo: { name: "Iron Arrow", count: 7, bolt: false }, power: { name: "Unrelenting Force", shout: true },
+          worn: [{ slot: "head", name: "Steel Helmet", armor: 19, weight: "heavy", enchant: "" }, { slot: "body", name: "Steel Armor", armor: 36, weight: "heavy", enchant: "" }, { slot: "hands", name: "Steel Gauntlets", armor: 14, weight: "heavy", enchant: "" }, { slot: "feet", name: "Steel Boots", armor: 14, weight: "heavy", enchant: "" }],
+          armorRating: 214, carry: { cur: 212, max: 300 }, resists: { fire: 15, frost: 0, shock: 0, magic: 10, poison: 0, disease: 0 } },
         consumables: [
           { name: "Potion of Plentiful Healing", count: 6, kind: "potion", effects: [{ name: "Restore Health", mag: 100, dur: 0, av: 24, archetype: 0, detrimental: false, recover: false }] },
-          { name: "Potion of Minor Healing", count: 2, kind: "potion", effects: [{ name: "Restore Health", mag: 25, dur: 0, av: 24, archetype: 0, detrimental: false, recover: false }] },
-          { name: "Potion of Extreme Magicka", count: 3, kind: "potion", effects: [{ name: "Restore Magicka", mag: 150, dur: 0, av: 25, archetype: 0, detrimental: false, recover: false }] },
-          { name: "Draught of Vigorous Stamina", count: 1, kind: "potion", effects: [{ name: "Restore Stamina", mag: 75, dur: 0, av: 26, archetype: 0, detrimental: false, recover: false }] },
+          { name: "Potion of Extreme Magicka", count: 2, kind: "potion", effects: [{ name: "Restore Magicka", mag: 150, dur: 0, av: 25, archetype: 0, detrimental: false, recover: false }] },
+          { name: "Draught of Vigorous Stamina", count: 4, kind: "potion", effects: [{ name: "Restore Stamina", mag: 75, dur: 0, av: 26, archetype: 0, detrimental: false, recover: false }] },
           { name: "Potion of Cure Disease", count: 1, kind: "potion", effects: [{ name: "Cure Disease", mag: 0, dur: 0, av: -1, archetype: 3, detrimental: false, recover: false }] },
-          { name: "Venison Stew", count: 4, kind: "food", effects: [{ name: "Restore Stamina", mag: 15, dur: 720, av: 157, archetype: 0, detrimental: false, recover: true }] },
-          { name: "Deadly Poison", count: 3, kind: "poison", effects: [{ name: "Damage Health", mag: 45, dur: 0, av: 24, archetype: 0, detrimental: true, recover: false }] }
-        ]
-      });
+          { name: "Venison Stew", count: 4, kind: "food", effects: [] }] });
     }, 150);
   }
 
   // ---------- frame loop ----------
-  function fitCanvas(c) {
-    const dpr = window.devicePixelRatio || 1, w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr);
-    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-    c.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  function frame() {
+  function fitCanvas(c) { const dpr = window.devicePixelRatio || 1, w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } c.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0); }
+  function frame(t) {
     if (app.state && app.shown) {
-      const p = app.state.player;
-      app.shown.x += (p.x - app.shown.x) * 0.25; app.shown.y += (p.y - app.shown.y) * 0.25;
-      const dh = ((p.heading - app.shown.h + 540) % 360) - 180; app.shown.h = (app.shown.h + dh * 0.3 + 360) % 360;
-      drawCompass(app.shown.h);
+      const p = app.state.player; app.shown.x += (p.x - app.shown.x) * .25; app.shown.y += (p.y - app.shown.y) * .25;
+      const dh = ((p.heading - app.shown.h + 540) % 360) - 180; app.shown.h = (app.shown.h + dh * .3 + 360) % 360;
     }
-    fitCanvas(world); fitCanvas(mini);
-    drawWorld(); drawMini();
+    fitCanvas(world); fitCanvas(mini); drawWorld(t); drawMini(t);
     requestAnimationFrame(frame);
   }
-
   (async () => {
-    const demo = new URLSearchParams(location.search).has("demo");
-    if (demo) app.demo = true;
+    const demo = new URLSearchParams(location.search).has("demo"); if (demo) app.demo = true;
     await loadStatic();
-    if (demo) startDemo();
-    else { setInterval(pollState, 150); setInterval(pollMarkers, 5000); pollState(); pollMarkers(); }
+    if (demo) startDemo(); else { setInterval(pollState, 150); setInterval(pollMarkers, 5000); pollState(); pollMarkers(); }
     requestAnimationFrame(frame);
   })();
 })();
