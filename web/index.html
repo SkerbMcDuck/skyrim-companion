@@ -138,6 +138,21 @@
   .cons { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 0 8px; align-items: center; font-size: 13px; padding: 1px 0; }
   .cons .cnt { min-width: 22px; text-align: right; }
 
+  .quest { flex-basis: 100%; font-size: 13px; display: flex; gap: 4px 12px; flex-wrap: wrap; }
+  .quest b { font-weight: 400; color: var(--gold); }
+  .quest .obj::before { content: "\25C6  "; color: var(--gold); font-size: 9px; }
+  .quest .old { color: var(--fg-mute); }
+  .skill { display: grid; grid-template-columns: 92px 26px 1fr; gap: 6px; align-items: center; font-size: 13px; padding: 1px 2px; }
+  .skill.gain { background: rgba(216,178,90,.12); box-shadow: inset 2px 0 0 var(--gold); }
+  .prot { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .prot .pct { font-size: 22px; line-height: 1; }
+  .flame { width: 26px; height: 32px; flex: none; }
+  .det .nm { font-size: 18px; letter-spacing: .03em; }
+  .det .kind { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-mute); }
+  .det .g2 { display: grid; grid-template-columns: auto 1fr; gap: 1px 12px; font-size: 13px; margin-top: 4px; }
+  .det .g2 > span:nth-child(odd) { color: var(--fg-dim); }
+  .sheet label { display: inline-flex; gap: 6px; align-items: center; margin: 2px 14px 2px 0; font-size: 13px; }
+
   /* settings / log pages */
   .sheet { position: fixed; inset: 0; background: rgba(5,6,7,.85); display: none; justify-content: center; align-items: flex-start; padding: 50px 16px 24px; z-index: 5; overflow: auto; }
   .sheet.open { display: flex; }
@@ -186,6 +201,7 @@
         <div class="maphead">
           <span class="loc" id="whereBig">—</span><span class="loc2" id="whereSmall"></span>
           <span class="when num" id="when"></span>
+          <div class="quest" id="quest"></div>
         </div>
         <div class="mapview">
           <canvas id="worldMap"></canvas>
@@ -199,7 +215,7 @@
         </div>
       </section>
       <div class="lowrow">
-        <section class="panel"><div class="ph"><h2>Crosshair</h2></div><div class="pb"><div class="soon">Crosshair details come in a later build.</div></div></section>
+        <section class="panel det"><div class="ph"><h2>Crosshair</h2></div><div class="pb" id="det"><div class="empty">Look at something</div></div></section>
         <section class="panel alerts" id="alerts"><div class="ph"><h2>Alerts</h2><span class="meta">clears on load</span></div><div class="pb"><div class="list" id="events"><div class="empty">Nothing yet</div></div></div></section>
         <section class="panel cal"><div class="ph"><h2 id="calMonth">Calendar</h2><span class="meta" id="calYear"></span></div><div class="pb" id="cal"></div></section>
       </div>
@@ -211,7 +227,7 @@
         <div class="pb">
           <div class="charhead">
             <span class="charname" id="charName">—</span>
-            <span class="lvring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#2a2d2f" stroke-width="3"/></svg><b id="charLevel">–</b></span>
+            <span class="lvring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#2a2d2f" stroke-width="3"/><circle id="lvArc" cx="18" cy="18" r="15" fill="none" stroke="#ece8df" stroke-width="3" stroke-dasharray="94.25" stroke-dashoffset="94.25"/></svg><b id="charLevel">–</b></span>
             <span class="goldcarry"><span class="goldc num" id="gold"></span><br><span class="dim num" id="carryTop"></span></span>
           </div>
           <div class="vit">
@@ -220,12 +236,13 @@
             <div class="vs"><div class="v num" id="vS">–</div><div class="l">Stamina</div><div class="s num" id="vSm"></div></div>
           </div>
           <div class="chips"><span class="chip" id="chipCombat">Combat</span><span class="chip" id="chipSneak">Sneaking</span><span class="chip" id="chipMount">Mounted</span></div>
+          <div id="skills" style="margin-top:6px"></div>
         </div>
       </section>
 
       <section class="panel">
         <div class="ph"><h2>Survival</h2><span class="meta" id="ambient"></span></div>
-        <div class="pb"><div class="surv" id="survival"><div class="empty">Survival Mode not detected</div></div></div>
+        <div class="pb"><div class="surv" id="survival"><div class="empty">Survival Mode not detected</div></div><div class="prot" id="prot" style="display:none"><svg class="flame" id="flame" viewBox="0 0 30 36"></svg><div><div class="pct num" id="protPct"></div><div class="mute" style="font-size:11px">cold protection</div></div><div class="dim num" id="protInfo" style="margin-left:auto;font-size:12px;text-align:right"></div></div></div>
       </section>
 
       <section class="panel eq">
@@ -493,7 +510,6 @@
   function watchAlerts(prev, s) {
     if (!prev) return;
     const p0 = prev.player, p1 = s.player;
-    if (p1.level > p0.level) addEvent(s, `Level up: ${p1.level}`);
     if (p1.inCombat && !p0.inCombat) addEvent(s, "Combat started", true);
     if (!p1.inCombat && p0.inCombat) addEvent(s, "Combat ended");
     const loc0 = prev.where.interior ? prev.where.cell : prev.where.location, loc1 = s.where.interior ? s.where.cell : s.where.location;
@@ -514,6 +530,10 @@
     if (s.equipment && prev.equipment && s.equipment.carry && prev.equipment.carry) {
       const over = (e) => e.carry.cur > e.carry.max;
       if (over(s.equipment) && !over(prev.equipment)) addEvent(s, "Over-encumbered", true);
+    }
+    if (prev.quests && s.quests) {
+      const had = new Set(prev.quests.map(q => q.quest + "|" + q.text));
+      for (const q of s.quests) if (!had.has(q.quest + "|" + q.text)) addEvent(s, `Quest: ${cleanText(q.text)}`);
     }
     const sv0 = prev.survival, sv1 = s.survival;
     if (sv0 && sv1) for (const [k, names] of [["hunger", HUNGER], ["cold", COLD], ["fatigue", FATIGUE]]) {
@@ -688,7 +708,7 @@
       const n = sv[k], max = n.max > 0 ? n.max : 1000, pct = clamp(n.value / max, 0, 1) * 100, st = stageFrom(n);
       const ticks = (n.thresholds || []).filter(t => t > 0 && t < max).map(t => `<span class="tk" style="left:${t / max * 100}%"></span>`).join("");
       return `<span>${esc(n.name)}</span><div class="bar" style="height:7px"><i style="width:${pct}%;background:${color}"></i>${ticks}</div>
-        <div class="st" style="${st >= 3 ? "color:var(--bad)" : ""}">${esc(names[st] || "")} <span class="mute num">${Math.round(n.value)} / ${Math.round(max)}</span></div>`;
+        <div class="st" style="${st >= 3 ? "color:var(--bad)" : ""}">${esc(names[st] || "")} <span class="mute num">${Math.round(n.value)} / ${Math.round(max)}</span> <span class="mute">${nextStageIn(k, n)}</span></div>`;
     }).join("");
     $("ambient").textContent = sv.ambientCold >= 0 ? "Area cold " + Math.round(sv.ambientCold) : "";
   }
@@ -719,7 +739,7 @@
     };
     let html = hand(eq.right, "Right") + hand(eq.left, "Left");
     if (eq.ammo) html += row("Ammo", esc(eq.ammo.name), `<span class="${eq.ammo.count < 10 ? "red" : ""}">${eq.ammo.count}</span>`);
-    if (eq.power) html += row(eq.power.shout ? "Shout" : "Power", esc(eq.power.name), "");
+    if (eq.power) html += row(eq.power.shout ? "Shout" : "Power", esc(eq.power.name), eq.power.shout ? `<span class="dim" id="shoutCd"></span>` : "");
     $("hands").innerHTML = html || `<div class="empty">Nothing in hand</div>`;
     const worn = (eq.worn || []).slice().sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
     $("worn").innerHTML = worn.map(a => row(SLOT_NAME[a.slot] || a.slot, esc(a.name) + (a.enchant ? ` <span class="mute">· ${esc(a.enchant)}</span>` : ""), a.armor ? Math.round(a.armor) : "")).join("") || `<div class="empty">No armor</div>`;
@@ -764,7 +784,7 @@
   }
   const isCure = (p) => (p.effects || []).some(e => e.archetype === 3 || /cure disease/i.test(e.name));
   const isSkooma = (p) => /skooma/i.test(p.name);
-  function renderConsumables(list) {
+  function renderConsumables(list, sup, warmth) {
     const el = $("consumables"); list = list || [];
     const tot = { h: [0, 0], m: [0, 0], s: [0, 0] };
     let cure = 0, skooma = 0, food = 0, poison = 0, other = 0;
@@ -781,13 +801,171 @@
       r("B", "Magicka", tot.m[0], tot.m[1] ? "+" + Math.round(tot.m[1]) : "", tot.m[0] <= 2 ? "red" : "") +
       r("N", "Stamina", tot.s[0], tot.s[1] ? "+" + Math.round(tot.s[1]) : "", tot.s[0] <= 2 ? "red" : "") +
       `<div class="rule"></div>` + r("", "Cure Disease", cure) + r("", "Skooma", skooma, "", skooma > 0 ? "red" : "") +
-      `<div class="rule"></div>` + r("", "Food", food) + r("", "Poisons", poison) + r("", "Other potions", other);
+      `<div class="rule"></div>` + foodRows(food, sup, warmth) + r("", "Poisons", poison) + r("", "Other potions", other) + extrasRows(sup);
+    fitList(el, "rows");
+  }
+
+  // ---------- game event feed (pickups, skill ups, level ups, discoveries) ----------
+  let lastEventId = null;
+  function runEvents(s) {
+    const list = s.events || [];
+    if (!list.length) return;
+    const maxId = Math.max(...list.map(e => e.id));
+    if (lastEventId === null) { lastEventId = maxId; return; }
+    for (const e of list.filter(e => e.id > lastEventId).sort((a, b) => a.id - b.id)) addEvent(s, e.text, false);
+    lastEventId = Math.max(lastEventId, maxId);
+  }
+  const cleanText = (x) => String(x || "").replace(/<[^>]*>/g, "").trim();
+
+  // ---------- level ring + skills tracker ----------
+  const skillXp = new Map(), skillGlow = new Map();
+  let chosenSkills = store.get("skills", null);
+  function renderProgress(pr) {
+    if (!pr) return;
+    const frac = pr.threshold > 0 ? clamp(pr.xp / pr.threshold, 0, 1) : 0;
+    $("lvArc").setAttribute("stroke-dashoffset", (94.25 * (1 - frac)).toFixed(2));
+    const now = Date.now();
+    for (const sk of pr.skills || []) {
+      const last = skillXp.get(sk.name);
+      if (last !== undefined && (sk.xp > last + 1e-4 || sk.level > (skillLevel.get(sk.name) || 0))) skillGlow.set(sk.name, now + 3000);
+      skillXp.set(sk.name, sk.xp); skillLevel.set(sk.name, sk.level);
+    }
+    const pick = chosenSkills && chosenSkills.length ? chosenSkills : (pr.skills || []).slice().sort((a, b) => b.level - a.level).slice(0, 4).map(x => x.name);
+    $("skills").innerHTML = (pr.skills || []).filter(x => pick.includes(x.name)).map(x => {
+      const glow = (skillGlow.get(x.name) || 0) > now, f = x.threshold > 0 ? clamp(x.xp / x.threshold, 0, 1) : 0;
+      return `<div class="skill ${glow ? "gain" : ""}"><span>${esc(x.name)}</span><span class="num dim">${Math.round(x.level)}</span><div class="bar"><i style="width:${f * 100}%;background:${glow ? "var(--gold)" : "var(--fg-dim)"}"></i></div></div>`;
+    }).join("");
+  }
+  const skillLevel = new Map();
+
+  // ---------- survival countdowns (rate measured from the last minute of readings) ----------
+  const needSamples = { hunger: [], cold: [], fatigue: [] };
+  function nextStageIn(key, n) {
+    const arr = needSamples[key], now = performance.now();
+    arr.push([now, n.value]); while (arr.length && now - arr[0][0] > 60000) arr.shift();
+    if (arr.length < 2) return "";
+    const [t0, v0] = arr[0], dt = (now - t0) / 1000, rate = (n.value - v0) / dt;
+    if (dt < 8) return "";
+    if (rate <= 1e-4) return rate < -1e-4 ? "easing" : "";
+    const next = (n.thresholds || []).filter(t => t > n.value).sort((a, b) => a - b)[0];
+    if (next === undefined) return "";
+    const sec = (next - n.value) / rate, m = Math.round(sec / 60);
+    return sec < 90 ? "next stage in <1 min" : m < 60 ? `next stage in ${m} min` : `next stage in ${Math.floor(m / 60)} h ${m % 60} min`;
+  }
+  function protColor(p) {
+    if (p >= .8 - 1e-6) return "var(--gold)";
+    const k = clamp(p / .8, 0, 1), a = [121, 184, 230], b = [239, 122, 53];
+    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * k)).join(",")})`;
+  }
+  function renderWarmth(w, sv) {
+    const el = $("prot");
+    if (!w || !w.cap || !sv || sv.enabled === 0) { el.style.display = "none"; return; }
+    el.style.display = "";
+    const p = .8 * clamp(w.rating, 0, w.cap) / w.cap;
+    $("protPct").textContent = Math.round(p * 100) + "%"; $("protPct").style.color = protColor(p);
+    const warming = w.uiLevel === 1;
+    $("protInfo").innerHTML = `Warmth ${Math.round(w.rating)} / ${Math.round(w.cap)}<br>${warming ? "Near fire, warming" : "No heat source"}`;
+    const t = performance.now(), h = warming ? 26 + Math.sin(t / 180) * 1.5 : 0, wd = 13;
+    $("flame").innerHTML = `<path d="M3 34 L27 30 M5 30 L25 34" stroke="#6b4a2a" stroke-width="2.5" stroke-linecap="round"/>` + (warming ?
+      `<path d="M15 ${32 - h} C ${15 + wd} ${32 - h * .55}, ${15 + wd * .8} 31, 15 31 C ${15 - wd * .8} 31, ${15 - wd} ${32 - h * .55}, 15 ${32 - h} Z" fill="#ef7a35"/>
+       <path d="M15 ${32 - h * .55} C ${15 + wd * .45} ${32 - h * .3}, ${15 + wd * .4} 31, 15 31 C ${15 - wd * .4} 31, ${15 - wd * .45} ${32 - h * .3}, 15 ${32 - h * .55} Z" fill="#ffd27a"/>` : "");
+  }
+
+  // ---------- quest header ----------
+  function renderQuest(qs) {
+    const el = $("quest");
+    if (!qs || !qs.length) { el.innerHTML = ""; return; }
+    const newest = qs[qs.length - 1], same = qs.filter(q => q.quest === newest.quest);
+    const older = same.slice(0, -1).slice(-2).reverse();
+    el.innerHTML = `<b>${esc(newest.quest)}</b><span class="obj">${esc(cleanText(newest.text))}</span>` + older.map(q => `<span class="old">${esc(cleanText(q.text))}</span>`).join("");
+  }
+
+  // ---------- crosshair details ----------
+  const WTYPE = { 0: "Fists", 1: "Sword", 2: "Dagger", 3: "War axe", 4: "Mace", 5: "Greatsword", 6: "Battleaxe", 7: "Bow", 8: "Staff", 9: "Crossbow" };
+  const SOULS = ["Empty", "Petty", "Lesser", "Common", "Greater", "Grand"];
+  const mineTimes = []; let lastSwings = null, lastSwingT = 0;
+  function renderDet(c) {
+    const el = $("det");
+    if (!c) { el.innerHTML = `<div class="empty">Look at something</div>`; lastSwings = null; return; }
+    const rows = [];
+    const add = (k, v) => { if (v !== undefined && v !== null && v !== "") rows.push(`<span>${k}</span><span>${v}</span>`); };
+    let kind = c.kind;
+    if (c.kind === "weapon") {
+      kind = WTYPE[c.weaponType] || "Weapon";
+      let cmp = "";
+      if (c.compare) { const d = c.damage - c.compare.damage; cmp = d > 0 ? ` <span class="goodc">▲ ${Math.round(d)} over ${esc(c.compare.name)}</span>` : d < 0 ? ` <span class="red">▼ ${Math.round(-d)} under ${esc(c.compare.name)}</span>` : ` <span class="mute">same as ${esc(c.compare.name)}</span>`; }
+      add("Damage", `<span class="num">${Math.round(c.damage)}</span> <span class="mute">base</span>${cmp}`);
+    } else if (c.kind === "armor") {
+      kind = (c.class === "clothing" ? "Clothing" : c.class === "heavy" ? "Heavy armor" : "Light armor") + (c.slot ? " · " + c.slot : "");
+      let cmp = "";
+      if (c.compare) { const d = c.armor - c.compare.armor, sameClass = c.compare.class === c.class; cmp = !sameClass ? ` <span class="mute">vs ${esc(c.compare.name)} (different class)</span>` : d > 0 ? ` <span class="goodc">▲ ${Math.round(d)} over ${esc(c.compare.name)}</span>` : d < 0 ? ` <span class="red">▼ ${Math.round(-d)} under ${esc(c.compare.name)}</span>` : ` <span class="mute">same as ${esc(c.compare.name)}</span>`; }
+      add("Armor", `<span class="num">${Math.round(c.armor)}</span> <span class="mute">base</span>${cmp}`);
+    } else if (c.kind === "book") {
+      kind = c.note ? "Note" : c.skill ? "Skill book · " + c.skill : "Book";
+      add("Read", c.read ? "Yes" : `<span class="goldc">No</span>`);
+    } else if (c.kind === "container") {
+      kind = "Container"; add("Lock", c.lock || "Unlocked"); add("Owner", c.owner ? esc(c.owner) : "None");
+    } else if (c.kind === "door") {
+      kind = "Door"; add("Leads to", c.leadsTo ? esc(c.leadsTo) : ""); add("Lock", c.lock || "Unlocked");
+    } else if (c.kind === "plant") {
+      kind = "Plant"; add("Gives", esc(c.gives)); add("Harvested", c.harvested ? "Yes" : "No");
+    } else if (c.kind === "ore") {
+      kind = "Ore vein"; const o = c.ore || {};
+      if (o.oreLeft === 0) add("Status", `<span class="red">Depleted</span>`);
+      else if (o.oreLeft < 0) add("Status", "Not started (amount rolls when you start)");
+      else {
+        add("Ore left", `<span class="num">${o.oreLeft * Math.max(1, o.orePerStrike)}</span>`);
+        const sw = o.swingsLeft > 0 ? o.swingsLeft : o.swingsEach;
+        add("Swings to next", `<span class="num">${sw}</span>`);
+        const now = performance.now();
+        if (lastSwings !== null && o.swingsLeft !== lastSwings) { if (lastSwingT) { mineTimes.push((now - lastSwingT) / 1000); if (mineTimes.length > 8) mineTimes.shift(); } lastSwingT = now; }
+        lastSwings = o.swingsLeft;
+        if (mineTimes.length) { const per = mineTimes.reduce((a, b) => a + b, 0) / mineTimes.length, total = (o.oreLeft - 1) * o.swingsEach + sw; add("Time to mine", `<span class="num">about ${Math.round(per * total)} s</span>`); }
+      }
+    } else if (c.kind === "actor") {
+      kind = c.dead ? "Dead" : c.hostile ? "Hostile" : "Creature or person";
+      add("Level", c.level); if (c.health && !c.dead) add("Health", `<span class="num">${Math.round(c.health.cur)} / ${Math.round(c.health.max)}</span>`);
+    } else kind = "Item";
+    if (c.weight !== undefined && c.kind !== "actor") {
+      add("Weight", `<span class="num">${+(+c.weight).toFixed(1)}</span>`);
+      add("Value", `<span class="num">${c.value}${c.weight > 0 ? ` <span class="mute">· ${(c.value / c.weight).toFixed(1)} per weight</span>` : ""}</span>`);
+    }
+    if (c.owner && c.kind !== "container") add("Owner", `<span class="${c.stealing ? "red" : ""}">${esc(c.owner)}${c.stealing ? " (stealing)" : ""}</span>`);
+    else if (c.stealing) add("Taking it", `<span class="red">counts as stealing</span>`);
+    el.innerHTML = `<div class="kind">${esc(kind)}</div><div class="nm">${esc(c.name || "")}</div><div class="g2">${rows.join("")}</div>`;
+  }
+
+  function foodRows(foodCount, sup, warmth) {
+    const tiers = [0, 0, 0, 0], restore = (warmth && warmth.restore) || [0, 0, 0, 0];
+    let hunger = 0;
+    for (const f of (sup && sup.food) || []) { if (/^raw\b/i.test(f.name)) continue; tiers[f.tier - 1] += f.count; hunger += f.count * (restore[f.tier - 1] || 0); }
+    const total = tiers.reduce((a, b) => a + b, 0);
+    if (!total) return `<div class="cons"><span></span><span>Food</span><span class="cnt num">${foodCount}</span><span></span></div>`;
+    return `<div class="cons"><span></span><span>Food</span><span class="cnt num">${total}</span><span class="num dim" style="font-size:12px">${Math.round(hunger)} hunger</span></div>
+      <div class="mute" style="font-size:11px;padding-left:30px">Large ${tiers[3]} · Medium ${tiers[2]} · Small ${tiers[1]} · Very small ${tiers[0]}</div>`;
+  }
+  function extrasRows(sup) {
+    if (!sup) return "";
+    let html = `<div class="rule"></div><div class="cons"><span></span><span>Lockpicks</span><span class="cnt num">${sup.lockpicks ?? 0}</span><span></span></div>`;
+    const empty = {}, filled = {};
+    for (const g of sup.soulGems || []) {
+      const size = g.black ? "Black" : SOULS[g.capacity] || "?";
+      if (g.soul > 0) filled[SOULS[g.soul] || "?"] = (filled[SOULS[g.soul] || "?"] || 0) + g.count; else empty[size] = (empty[size] || 0) + g.count;
+    }
+    const fmt = (o) => Object.entries(o).map(([k, v]) => `${k} ${v}`).join(" · ");
+    if (Object.keys(empty).length) html += `<div class="dim" style="font-size:12px">Empty gems: ${esc(fmt(empty))}</div>`;
+    if (Object.keys(filled).length) html += `<div class="dim" style="font-size:12px">Filled: ${esc(fmt(filled))}</div>`;
+    const b = sup.bounties || [];
+    html += `<div class="dim" style="font-size:12px">${b.length ? "Bounty: " + b.map(x => `<span class="red">${esc(x.faction.replace(/^Crime Faction /i, ""))} ${x.bounty}</span>`).join(" · ") : "No bounties"}</div>`;
+    return html;
   }
 
   let lastSlow = 0;
   function renderPanels(s) {
     renderCharacter(s); renderHeaderAndCalendar(s); renderParty(s.followers); renderEffects(s.effects); renderSurvival(s.survival);
-    if (Date.now() - lastSlow > 900) { lastSlow = Date.now(); renderEquipment(s.equipment); renderConsumables(s.consumables); }
+    runEvents(s); renderProgress(s.progress); renderWarmth(s.warmth, s.survival); renderDet(s.crosshair);
+    if (Date.now() - lastSlow > 900) { lastSlow = Date.now(); renderEquipment(s.equipment); renderConsumables(s.consumables, s.supplies, s.warmth); renderQuest(s.quests); }
+    const cd = $("shoutCd"); if (cd) cd.textContent = s.shoutCooldown > .5 ? Math.ceil(s.shoutCooldown) + " s" : "";
   }
   window.addEventListener("resize", () => { lastSlow = 0; if (app.state) renderPanels(app.state); renderEvents(); });
 
@@ -796,8 +974,12 @@
     $("sheetBody").innerHTML = `<div class="grp">Hotkeys in game</div>` +
       [["Num +", "Zoom in"], ["Num −", "Zoom out"], ["Num *", "Change map view"], ["Num .", "Show undiscovered markers"], ["Num /", "Show abilities"], ["V", "Health potion (Smart Optimal Salves)"], ["B", "Magicka potion"], ["N", "Stamina potion"]]
         .map(k => `<div class="row2"><span class="key">${k[0]}</span><span>${k[1]}</span></div>`).join("") +
+      `<div class="grp" style="margin-top:12px">Skills to track</div><div id="skillPick">` +
+      ((app.state && app.state.progress && app.state.progress.skills) || []).map(x => `<label><input type="checkbox" value="${esc(x.name)}" ${(chosenSkills || []).includes(x.name) ? "checked" : ""}> ${esc(x.name)}</label>`).join("") +
+      `</div><div class="mute" style="font-size:12px">None ticked shows your four highest skills.</div>` +
       `<div class="grp" style="margin-top:12px">Coming in later builds</div><div class="dim" style="font-size:13px">Party slots, opponent focus, layout editor, hidden effects, log folder.</div>`;
     $("sheet").classList.add("open"); $("tabSettings").classList.add("on"); $("tabHub").classList.remove("on");
+    $("skillPick").onchange = () => { chosenSkills = [...$("skillPick").querySelectorAll("input:checked")].map(i => i.value); store.set("skills", chosenSkills); };
   }
   function closeSheet() { $("sheet").classList.remove("open"); $("tabSettings").classList.remove("on"); $("tabHub").classList.add("on"); }
   $("tabSettings").onclick = openSettings; $("tabHub").onclick = closeSheet; $("sheetClose").onclick = closeSheet;
@@ -831,6 +1013,13 @@
         equipment: { right: { name: "Steel Sword", kind: "weapon", weaponType: 1, damage: 11, enchant: "" }, left: { name: "Flames", kind: "spell", effects: [] }, ammo: { name: "Iron Arrow", count: 7, bolt: false }, power: { name: "Unrelenting Force", shout: true },
           worn: [{ slot: "head", name: "Steel Helmet", armor: 19, weight: "heavy", enchant: "" }, { slot: "body", name: "Steel Armor", armor: 36, weight: "heavy", enchant: "" }, { slot: "hands", name: "Steel Gauntlets", armor: 14, weight: "heavy", enchant: "" }, { slot: "feet", name: "Steel Boots", armor: 14, weight: "heavy", enchant: "" }],
           armorRating: 214, carry: { cur: 212, max: 300 }, resists: { fire: 15, frost: 0, shock: 0, magic: 10, poison: 0, disease: 0 } },
+        progress: { xp: 640, threshold: 1000, skills: ["One-handed", "Two-handed", "Archery", "Block", "Smithing", "Heavy Armor", "Light Armor", "Pickpocket", "Lockpicking", "Sneak", "Alchemy", "Speech", "Alteration", "Conjuration", "Destruction", "Illusion", "Restoration", "Enchanting"].map((n, i) => ({ name: n, level: 15 + (i * 7) % 40, xp: (i === 4 ? (t * 4000) % 300 : 120), threshold: 300 })) },
+        warmth: { rating: 115, cap: 200, uiLevel: fight ? 0 : 1, restore: [15, 40, 90, 160] },
+        shoutCooldown: fight ? 12 : 0,
+        supplies: { lockpicks: 14, soulGems: [{ capacity: 1, soul: 0, count: 2, black: false }, { capacity: 5, soul: 3, count: 1, black: false }], food: [{ name: "Venison Stew", count: 4, tier: 3 }, { name: "Apple", count: 3, tier: 1 }], bounties: [{ faction: "Crime Faction Falkreath", bounty: 40 }] },
+        quests: [{ quest: "Bleak Falls Barrow", text: "Find the Dragonstone", index: 10 }, { quest: "Bleak Falls Barrow", text: "Retrieve the Dragonstone", index: 20 }],
+        crosshair: { name: "Steel War Axe", kind: "weapon", weaponType: 3, damage: 12, value: 55, weight: 13, owner: "Belethor", stealing: true, compare: { name: "Steel Sword", damage: 8 } },
+        events: [{ id: 1 + Math.floor(t * 50), text: "Picked up Iron Ore (2)", kind: "pickup" }],
         consumables: [
           { name: "Potion of Plentiful Healing", count: 6, kind: "potion", effects: [{ name: "Restore Health", mag: 100, dur: 0, av: 24, archetype: 0, detrimental: false, recover: false }] },
           { name: "Potion of Extreme Magicka", count: 2, kind: "potion", effects: [{ name: "Restore Magicka", mag: 150, dur: 0, av: 25, archetype: 0, detrimental: false, recover: false }] },

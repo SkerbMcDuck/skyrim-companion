@@ -1,6 +1,7 @@
 #include "Server.h"
 #include "State.h"
 #include "Hotkeys.h"
+#include "Feed.h"
 
 namespace
 {
@@ -80,7 +81,8 @@ namespace
 			auto text = companion::state::GetStateJson();
 			const auto end = text.rfind('}');
 			if (end != std::string::npos) {
-				text.insert(end, ",\"commands\":" + companion::hotkeys::Recent().dump());
+				text.insert(end, ",\"commands\":" + companion::hotkeys::Recent().dump() +
+				                     ",\"events\":" + companion::feed::Recent().dump(-1, ' ', false, json::error_handler_t::replace));
 			}
 			return { 200, "application/json", text };
 		}
@@ -102,6 +104,7 @@ namespace
 		case SKSE::MessagingInterface::kDataLoaded:
 			companion::state::StartPolling();
 			companion::hotkeys::Install();
+			companion::feed::Install();
 			break;
 		case SKSE::MessagingInterface::kPreLoadGame:
 			companion::state::SetGameReady(false);

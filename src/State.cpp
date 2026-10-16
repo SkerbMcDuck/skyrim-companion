@@ -1,5 +1,7 @@
 #include "State.h"
 #include "Readouts.h"
+#include "Extras.h"
+#include "Feed.h"
 
 namespace companion::state
 {
@@ -177,11 +179,17 @@ namespace companion::state
 					state["effects"] = safely("Active effects", [&] { return readouts::ActiveEffects(player); });
 					state["survival"] = safely("Survival", [] { return readouts::Survival(); });
 					state["followers"] = safely("Followers", [&] { return readouts::Followers(player); });
+					state["progress"] = safely("Progress", [&] { return extras::Progress(player); });
+					state["warmth"] = safely("Warmth", [&] { return extras::Warmth(player); });
+					state["crosshair"] = safely("Crosshair", [&] { return extras::Crosshair(player); });
+					state["shoutCooldown"] = safely("Shout cooldown", [&] { return json(extras::ShoutCooldown(player)); });
 					if (++g_ticksSinceInventory >= 10) {
 						g_ticksSinceInventory = 0;
 						g_slowParts = {
 							{ "equipment", safely("Equipment", [&] { return readouts::Equipment(player); }) },
-							{ "consumables", safely("Consumables", [&] { return readouts::Consumables(player); }) }
+							{ "consumables", safely("Consumables", [&] { return readouts::Consumables(player); }) },
+							{ "supplies", safely("Supplies", [&] { return extras::Supplies(player); }) },
+							{ "quests", safely("Quests", [&] { return extras::Quests(player); }) }
 						};
 					}
 					state.update(g_slowParts);
@@ -217,6 +225,7 @@ namespace companion::state
 		if (a_ready) {
 			// SKSE load/new-game messages arrive on the main thread.
 			readouts::ResetFollowers();
+			feed::Clear();
 		}
 		g_gameReady = a_ready;
 		g_rescanMarkers = true;  // a different save can have different markers
