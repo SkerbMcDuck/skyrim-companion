@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 

@@ -303,8 +303,9 @@
     app.state = s;
     if (!app.shown) app.shown = { x: s.player.x, y: s.player.y, h: s.player.heading };
 
+    // Indoors there is no worldspace, so keep the last outdoor map loaded.
     const ws = s.where.worldspaceId;
-    if (ws !== app.worldspace) {
+    if (ws && ws !== app.worldspace) {
       app.worldspace = ws;
       loadCalibration();
       loadImage();

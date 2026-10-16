@@ -9,13 +9,14 @@ namespace companion::state
 
 		std::atomic<bool> g_gameReady{ false };
 		std::atomic<bool> g_taskPending{ false };
+		std::atomic<bool> g_rescanMarkers{ true };
 
 		std::mutex  g_lock;
 		std::string g_stateJson = R"({"ready":false})";
 		std::string g_markersJson = R"({"worldspace":0,"markers":[]})";
 
 		// Only touched on the game thread.
-		RE::FormID g_lastWorldspace = 0;
+		RE::FormID g_lastWorldspace = 0xFFFFFFFF;
 		int        g_ticksSinceMarkers = kMarkerRefreshTicks;
 
 		std::string SafeName(const char* a_name)
@@ -83,43 +84,69 @@ namespace companion::state
 			return j;
 		}
 
-		// Collects every map marker (cities, caves, ruins, ...) in the player's current worldspace.
-		json BuildMarkers(RE::TESWorldSpace* a_worldspace)
-		{
-			json list = json::array();
-			if (!a_worldspace) {
-				return json{ { "worldspace", 0 }, { "markers", list } };
-			}
+		// Map marker references in the current worldspace, found once per worldspace.
+		// Re-reading these few hundred refs is cheap; scanning every form in the game is not.
+		std::vector<RE::FormID> g_markerIds;
+		RE::FormID              g_markerIdsWorldspace = 0;
 
+		RE::ExtraMapMarker* GetMarkerExtra(RE::TESObjectREFR* a_ref)
+		{
+			if (!a_ref || a_ref->IsDeleted()) {
+				return nullptr;
+			}
+			const auto extra = a_ref->extraList.GetByType<RE::ExtraMapMarker>();
+			return extra && extra->mapData ? extra : nullptr;
+		}
+
+		void ScanMarkers(RE::TESWorldSpace* a_worldspace)
+		{
+			g_markerIds.clear();
+			g_markerIdsWorldspace = a_worldspace->GetFormID();
+
+			const auto start = std::chrono::steady_clock::now();
 			const auto& [map, lock] = RE::TESForm::GetAllForms();
 			if (map) {
 				[[maybe_unused]] const RE::BSReadLockGuard guard{ lock };
-				for (const auto& [id, form] : *map) {
+				for (const auto& entry : *map) {
+					const auto form = entry.second;
 					if (!form || !form->Is(RE::FormType::Reference)) {
 						continue;
 					}
 					const auto ref = form->As<RE::TESObjectREFR>();
-					if (!ref || ref->IsDeleted()) {
-						continue;
+					if (GetMarkerExtra(ref) && ref->GetWorldspace() == a_worldspace) {
+						g_markerIds.push_back(ref->GetFormID());
 					}
-					const auto extra = ref->extraList.GetByType<RE::ExtraMapMarker>();
-					if (!extra || !extra->mapData) {
-						continue;
-					}
-					if (ref->GetWorldspace() != a_worldspace) {
-						continue;
-					}
-					const auto data = extra->mapData;
-					const auto refPos = ref->GetPosition();
-					list.push_back({
-						{ "name", SafeName(data->locationName.GetFullName()) },
-						{ "x", refPos.x },
-						{ "y", refPos.y },
-						{ "type", data->type.underlying() },
-						{ "seen", data->flags.all(RE::MapMarkerData::Flag::kVisible) },
-						{ "discovered", data->flags.all(RE::MapMarkerData::Flag::kCanTravelTo) }
-					});
 				}
+			}
+			const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
+			logs::info("Found {} map markers in {} ({} ms)", g_markerIds.size(), SafeName(a_worldspace->GetName()), ms);
+		}
+
+		// Builds the marker list (cities, caves, ruins, ...) for the player's current worldspace.
+		json BuildMarkers(RE::TESWorldSpace* a_worldspace)
+		{
+			if (g_rescanMarkers || g_markerIdsWorldspace != a_worldspace->GetFormID()) {
+				ScanMarkers(a_worldspace);
+				g_rescanMarkers = false;
+			}
+
+			json list = json::array();
+			for (const auto id : g_markerIds) {
+				const auto ref = RE::TESForm::LookupByID<RE::TESObjectREFR>(id);
+				const auto extra = GetMarkerExtra(ref);
+				if (!extra) {
+					continue;
+				}
+				const auto data = extra->mapData;
+				const auto refPos = ref->GetPosition();
+				list.push_back({
+					{ "name", SafeName(data->locationName.GetFullName()) },
+					{ "x", refPos.x },
+					{ "y", refPos.y },
+					{ "type", data->type.underlying() },
+					{ "seen", data->flags.all(RE::MapMarkerData::Flag::kVisible) },
+					{ "discovered", data->flags.all(RE::MapMarkerData::Flag::kCanTravelTo) }
+				});
 			}
 			return json{ { "worldspace", a_worldspace->GetFormID() }, { "markers", list } };
 		}
@@ -139,7 +166,8 @@ namespace companion::state
 					const RE::FormID wsId = worldspace ? worldspace->GetFormID() : 0;
 					std::string markersText;
 					if (wsId != g_lastWorldspace || ++g_ticksSinceMarkers >= kMarkerRefreshTicks) {
-						if (worldspace || wsId != g_lastWorldspace) {
+						// Indoors there is no worldspace; keep showing the last outdoor markers.
+						if (worldspace) {
 							markersText = BuildMarkers(worldspace).dump();
 						}
 						g_lastWorldspace = wsId;
@@ -162,6 +190,7 @@ namespace companion::state
 	void SetGameReady(bool a_ready)
 	{
 		g_gameReady = a_ready;
+		g_rescanMarkers = true;  // a different save can have different markers
 		if (!a_ready) {
 			std::scoped_lock l{ g_lock };
 			g_stateJson = R"({"ready":false})";
