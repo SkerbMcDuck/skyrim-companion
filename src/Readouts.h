@@ -7,6 +7,8 @@ namespace companion::readouts
 	json Survival();
 	json Equipment(RE::PlayerCharacter* a_player);
 	json Consumables(RE::PlayerCharacter* a_player);
+	json Followers(RE::PlayerCharacter* a_player);
+	void ResetFollowers();  // call from the game thread when a save loads
 
 	// "Plugin.esp|00ABC" form used by Map Marker Framework / CoMAP configs.
 	std::string RefKey(const RE::TESForm* a_form);

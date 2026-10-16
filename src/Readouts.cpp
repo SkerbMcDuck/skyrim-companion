@@ -274,4 +274,96 @@ namespace companion::readouts
 		}
 		return list;
 	}
+
+	// Followers: any loaded actor flagged as the player's teammate. Once seen, a follower is
+	// remembered so we can still report where they are after they're left behind or unloaded.
+	namespace
+	{
+		std::vector<RE::FormID> g_knownFollowers;
+	}
+
+	void ResetFollowers()
+	{
+		g_knownFollowers.clear();
+	}
+
+	json Followers(RE::PlayerCharacter* a_player)
+	{
+		auto& known = g_knownFollowers;
+
+		if (const auto lists = RE::ProcessLists::GetSingleton(); lists) {
+			for (const auto& handle : lists->highActorHandles) {
+				const auto actor = handle.get();
+				if (actor && actor->IsPlayerTeammate() && std::find(known.begin(), known.end(), actor->GetFormID()) == known.end()) {
+					known.push_back(actor->GetFormID());
+				}
+			}
+		}
+
+		json list = json::array();
+		const auto playerPos = a_player->GetPosition();
+		const auto playerCell = a_player->GetParentCell();
+		const auto playerWs = a_player->GetWorldspace();
+
+		std::vector<RE::FormID> keep;
+		for (const auto id : known) {
+			const auto actor = RE::TESForm::LookupByID<RE::Actor>(id);
+			if (!actor || actor->IsDeleted()) {
+				continue;
+			}
+			const bool dead = actor->IsDead(false);
+			// Dismissed followers drop off; dead ones stay listed (until the next load) so you notice.
+			if (!actor->IsPlayerTeammate() && !dead) {
+				continue;
+			}
+			keep.push_back(id);
+
+			const auto owner = actor->AsActorValueOwner();
+			auto av = [&](RE::ActorValue a) {
+				const float cur = owner->GetActorValue(a);
+				const float max = owner->GetPermanentActorValue(a) + actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, a);
+				return json{ { "cur", cur }, { "max", max } };
+			};
+
+			const auto cell = actor->GetParentCell();
+			const auto ws = actor->GetWorldspace();
+			const auto loc = actor->GetCurrentLocation();
+			const auto pos = actor->GetPosition();
+			const bool sameSpace = cell && playerCell && (cell == playerCell || (ws && ws == playerWs));
+			const auto state = actor->AsActorState();
+
+			std::string status = "Following";
+			if (dead) {
+				status = "Dead";
+			} else if (state && state->IsBleedingOut()) {
+				status = "Downed";
+			} else if (actor->IsInCombat()) {
+				status = "In combat";
+			} else if (!sameSpace) {
+				status = "Away";
+			}
+
+			list.push_back({
+				{ "name", Str(actor->GetName()) },
+				{ "level", actor->GetLevel() },
+				{ "health", av(RE::ActorValue::kHealth) },
+				{ "magicka", av(RE::ActorValue::kMagicka) },
+				{ "stamina", av(RE::ActorValue::kStamina) },
+				{ "status", status },
+				{ "dead", dead },
+				{ "loaded", actor->Is3DLoaded() },
+				{ "mounted", actor->IsOnMount() },
+				{ "sameSpace", sameSpace },
+				{ "distance", sameSpace ? pos.GetDistance(playerPos) : -1.0f },
+				{ "x", pos.x },
+				{ "y", pos.y },
+				{ "worldspaceId", ws ? ws->GetFormID() : 0 },
+				{ "interior", cell ? cell->IsInteriorCell() : false },
+				{ "cell", cell ? Str(cell->GetName()) : "" },
+				{ "location", loc ? Str(loc->GetName()) : "" }
+			});
+		}
+		known = keep;
+		return list;
+	}
 }

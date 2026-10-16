@@ -38,6 +38,17 @@
   .panel.grow2 { flex: 2 1 0; }
   .panel.grow3 { flex: 3 1 0; }
   .panel .list { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .member { padding: 4px 2px 5px; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .member:last-child { border-bottom: 0; }
+  .member .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .member .nm { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .member .st { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .member .st.bad { color: var(--bad); } .member .st.warn { color: var(--gold); }
+  .member .where { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mbars { display: grid; grid-template-columns: 3fr 1fr 1fr; gap: 3px; margin-top: 3px; }
+  .mbars i { display: block; height: 5px; background: rgba(255,255,255,.08); position: relative; }
+  .mbars i b { position: absolute; inset: 0 auto 0 0; }
+  .member.dead { opacity: .5; }
   .more { font-size: 12px; color: var(--dim); padding: 3px 2px 0; letter-spacing: .04em; }
   .sumchips { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); margin: -2px 0 4px; }
   .sumchips b { color: var(--ink); font-weight: 400; }
@@ -144,6 +155,10 @@
 <div class="app">
   <!-- LEFT: effects + consumables -->
   <aside class="col" id="colLeft">
+    <section class="panel" id="partyPanel" style="display:none">
+      <h2>Party <small id="partyCount"></small></h2>
+      <div class="list" id="party"></div>
+    </section>
     <section class="panel grow3">
       <h2>Active Effects <label class="toggle"><input type="checkbox" id="setHidden"> hidden</label></h2>
       <div class="list" id="effects"><div class="empty">No active effects</div></div>
@@ -311,6 +326,15 @@
       ctx.save(); ctx.globalAlpha = m.discovered ? 1 : 0.75;
       ctx.drawImage(ic.e.el, x - s / 2, y - s / 2, s, s); ctx.restore();
     } else drawFallbackMarker(ctx, x, y, m, size);
+  }
+  // Followers in the same space as the player, drawn as small green dots.
+  function drawFollowers(ctx, toScreen, s) {
+    for (const f of (s.followers || [])) {
+      if (f.dead || !f.sameSpace) continue;
+      const [x, y] = toScreen(f.x, f.y);
+      ctx.save(); ctx.fillStyle = f.status === "Downed" ? "#ff5a4a" : "#7fd36b"; ctx.strokeStyle = "#10140c"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
+    }
   }
   function drawPlayer(ctx, x, y, headingDeg, size) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(headingDeg * Math.PI / 180);
@@ -546,6 +570,7 @@
         ctx.strokeText(m.name, x, y + size * 0.5 + 13); ctx.fillText(m.name, x, y + size * 0.5 + 13);
       }
     }
+    if (s && !s.where.interior) drawFollowers(ctx, W2S, s);
     if (s && app.shown && !s.where.interior) {
       const [x, y] = W2S(app.shown.x, app.shown.y);
       drawPlayer(ctx, x, y, app.shown.h, 13);
@@ -611,6 +636,7 @@
         const [x, y] = toScreen(m.x, m.y); drawMarker(ctx, x, y, m, 22);
       }
     }
+    drawFollowers(ctx, toScreen, s);
     ctx.restore();
     ring(ctx, w, h, R);
     ctx.fillStyle = "#d8c08a"; ctx.font = "14px " + getComputedStyle(document.body).fontFamily; ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -794,6 +820,28 @@
     fitList(el, "items");
   }
 
+  function renderParty(list) {
+    const panel = $("partyPanel");
+    if (!list || !list.length) { panel.style.display = "none"; return; }
+    panel.style.display = "";
+    $("partyCount").textContent = list.filter(f => !f.dead).length + " with you";
+    const pct = (v) => v && v.max > 0 ? clamp(v.cur / v.max, 0, 1) * 100 : 0;
+    const order = { "Downed": 0, "In combat": 1, "Following": 2, "Away": 3, "Dead": 4 };
+    const sorted = list.slice().sort((a, b) => (order[a.status] ?? 5) - (order[b.status] ?? 5) || a.name.localeCompare(b.name));
+    $("party").innerHTML = sorted.map(f => {
+      const cls = f.status === "Downed" || f.status === "Dead" ? "bad" : f.status === "In combat" ? "warn" : "";
+      const dist = f.distance >= 0 ? Math.round(f.distance / 70) + " m" : "";
+      const where = f.sameSpace ? (dist ? dist + " away" : "") : (f.interior ? (f.cell || "Interior") : (f.location || f.cell || "Elsewhere"));
+      const lowHp = pct(f.health) < 30 && !f.dead;
+      return `<div class="member ${f.dead ? "dead" : ""}">
+        <div class="top"><span class="nm">${esc(f.name)} <span class="dim" style="font-size:12px">${f.level}</span></span><span class="st ${cls}">${esc(f.status)}${f.mounted ? " · mounted" : ""}</span></div>
+        <div class="mbars"><i><b style="width:${pct(f.health)}%;background:${lowHp ? "#ff5a4a" : "var(--health)"}"></b></i><i><b style="width:${pct(f.magicka)}%;background:var(--magicka)"></b></i><i><b style="width:${pct(f.stamina)}%;background:var(--stamina)"></b></i></div>
+        ${where ? `<div class="where">${esc(where)}</div>` : ""}
+      </div>`;
+    }).join("");
+    fitList($("party"), "followers");
+  }
+
   let lastSlow = 0;
   function renderPanels(s) {
     const p = s.player;
@@ -811,6 +859,7 @@
     const wh = s.where;
     $("whereBig").textContent = wh.interior ? (wh.cell || "Interior") : (wh.location || wh.worldspace || "Wilderness");
     $("whereSmall").textContent = wh.interior ? (wh.location || "") : (wh.worldspace || "");
+    renderParty(s.followers);
     renderEffects(s.effects);
     renderSurvival(s.survival);
     // Inventory-based panels change slowly; don't rebuild them on every update.
@@ -839,6 +888,11 @@
         stats: { health: { cur: 380 + 60 * Math.sin(t * 20), max: 440 }, magicka: { cur: 290, max: 360 }, stamina: { cur: 150, max: 240 } },
         where: { worldspaceId: 60, worldspace: "Skyrim", worldspaceEdid: "Tamriel", cell: "", interior: false, location: "Whiterun Hold" },
         time: { hour: (9 + t * 40) % 24, day: 17, dayName: "Morndas", month: "Last Seed", year: 201 },
+        followers: [
+          { name: "Lydia", level: 28, health: { cur: 310, max: 420 }, magicka: { cur: 50, max: 50 }, stamina: { cur: 200, max: 260 }, status: Math.sin(t * 9) > 0.85 ? "In combat" : "Following", dead: false, loaded: true, mounted: false, sameSpace: true, distance: 420, x: x - 300, y: y - 250, worldspaceId: 60, interior: false, cell: "", location: "Whiterun Hold" },
+          { name: "Meeko", level: 10, health: { cur: 40, max: 160 }, magicka: { cur: 0, max: 0 }, stamina: { cur: 80, max: 100 }, status: "Following", dead: false, loaded: true, mounted: false, sameSpace: true, distance: 180, x: x + 150, y: y - 80, worldspaceId: 60, interior: false, cell: "", location: "Whiterun Hold" },
+          { name: "Serana", level: 31, health: { cur: 380, max: 380 }, magicka: { cur: 300, max: 300 }, stamina: { cur: 200, max: 200 }, status: "Away", dead: false, loaded: false, mounted: false, sameSpace: false, distance: -1, x: 0, y: 0, worldspaceId: 0, interior: true, cell: "Breezehome", location: "Whiterun" }
+        ],
         effects: [
           { name: "Fortify Destruction", desc: "Destruction spells are <mag>% stronger for <dur> seconds.", spell: "Potion of the Warlock", spellType: 7, item: "", caster: "You", mag: 25, dur: 60, elapsed: (t * 900) % 60, archetype: 0, av: 20, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
           { name: "Fortify Health", desc: "Health is increased by <mag> points.", spell: "Ring of Health", spellType: 6, item: "Ring of Health", caster: "You", mag: 40, dur: 0, elapsed: 0, archetype: 0, av: 24, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },

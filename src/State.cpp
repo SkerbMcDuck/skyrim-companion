@@ -176,6 +176,7 @@ namespace companion::state
 					};
 					state["effects"] = safely("Active effects", [&] { return readouts::ActiveEffects(player); });
 					state["survival"] = safely("Survival", [] { return readouts::Survival(); });
+					state["followers"] = safely("Followers", [&] { return readouts::Followers(player); });
 					if (++g_ticksSinceInventory >= 10) {
 						g_ticksSinceInventory = 0;
 						g_slowParts = {
@@ -213,6 +214,10 @@ namespace companion::state
 
 	void SetGameReady(bool a_ready)
 	{
+		if (a_ready) {
+			// SKSE load/new-game messages arrive on the main thread.
+			readouts::ResetFollowers();
+		}
 		g_gameReady = a_ready;
 		g_rescanMarkers = true;  // a different save can have different markers
 		g_ticksSinceInventory = 1000;
