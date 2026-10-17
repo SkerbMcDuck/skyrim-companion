@@ -246,17 +246,17 @@ namespace companion::extras
 		if (!list || !tes) {
 			return false;
 		}
-		bool near = false;
+		bool found = false;
 		tes->ForEachReferenceInRange(a_player, 580.0f, [&](RE::TESObjectREFR* a_ref) {
 			if (a_ref && !a_ref->IsDisabled() && a_ref->Is3DLoaded()) {
 				if (const auto base = a_ref->GetBaseObject(); base && list->HasForm(base)) {
-					near = true;
+					found = true;
 					return RE::BSContainer::ForEachResult::kStop;
 				}
 			}
 			return RE::BSContainer::ForEachResult::kContinue;
 		});
-		return near;
+		return found;
 	}
 
 	json Warmth(RE::PlayerCharacter* a_player)
