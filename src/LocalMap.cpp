@@ -169,7 +169,7 @@ namespace companion::localmap
 
 		// Floor plan: one vertex list and one triangle list for the whole area.
 		json verts = json::array(), tris = json::array();
-		std::string explored;
+		std::vector<bool> allBits;
 		std::size_t vbase = 0;
 		for (const auto mesh : MeshesIn(cells)) {
 			for (const auto& v : mesh->vertices) {
@@ -184,14 +184,11 @@ namespace companion::localmap
 			}
 			vbase += mesh->vertices.size();
 			const auto it = g_explored.find(mesh->GetFormID());
-			std::vector<bool> bits = it != g_explored.end() ? it->second : std::vector<bool>(mesh->triangles.size(), false);
-			bits.resize(mesh->triangles.size(), false);
-			// Pad to a multiple of 4 so each mesh starts on a hex digit boundary.
-			while (bits.size() % 4) {
-				bits.push_back(false);
+			for (std::size_t i = 0; i < mesh->triangles.size(); ++i) {
+				allBits.push_back(it != g_explored.end() && i < it->second.size() && it->second[i]);
 			}
-			explored += Hex(bits);
 		}
+		const std::string explored = Hex(allBits);
 
 		// Doors, containers and ore veins in the area.
 		json doors = json::array(), containers = json::array(), ores = json::array();

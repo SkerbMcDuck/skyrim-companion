@@ -153,11 +153,32 @@
   .det .g2 > span:nth-child(odd) { color: var(--fg-dim); }
   .sheet label { display: inline-flex; gap: 6px; align-items: center; margin: 2px 14px 2px 0; font-size: 13px; }
 
+  #localMap { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .mapnote { position: absolute; left: 10px; bottom: 8px; font-size: 12px; color: var(--fg-dim); background: rgba(0,0,0,.6); padding: 2px 8px; pointer-events: none; }
+  .mapnote:empty { display: none; }
+  .opp .nm { font-size: 18px; letter-spacing: .03em; }
+  .tag { display: inline-block; font-size: 12px; border: 1px solid var(--line); padding: 0 6px; margin: 3px 4px 0 0; color: var(--fg-dim); }
+  .tag.weak { color: var(--fire); border-color: #6b3a1e; } .tag.res { color: var(--frost); border-color: #2b4a60; }
+  .orow { display: flex; gap: 8px; font-size: 13px; padding: 1px 0; } .orow .r { margin-left: auto; }
+  .pcard { cursor: pointer; } .pcard:hover .pname { color: #fff; }
+  .ess { font-size: 10px; letter-spacing: .1em; color: var(--gold); border: 1px solid #5a4a22; padding: 0 3px; }
+  .pbtn { font: 11px var(--font); letter-spacing: .1em; text-transform: uppercase; background: transparent; color: var(--fg-dim); border: 1px solid var(--line); padding: 0 6px; cursor: pointer; margin-left: 6px; }
+  .eff.sel { background: rgba(216,178,90,.12); box-shadow: inset 2px 0 0 var(--gold); }
+  .effx { grid-column: 2 / 4; font-size: 12px; color: var(--fg-dim); }
+  .book { font-family: Georgia, "Times New Roman", serif; background: #e6dbc0; color: #2c241a; padding: 22px 28px; line-height: 1.55; font-size: 15px; max-height: 60vh; overflow: auto; }
+  .book hr { border: 0; border-top: 1px dashed #9a8a6a; margin: 18px 0; }
+  .logtext { font-family: Consolas, monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; color: var(--fg-dim); max-height: 60vh; overflow: auto; }
+  .sheet input[type=text] { font: 13px var(--font); background: #111; color: var(--fg); border: 1px solid var(--line); padding: 3px 6px; width: 420px; max-width: 100%; }
+  .edit .panel { outline: 1px dashed var(--gold); }
+  .pmove { display: none; gap: 2px; margin-left: 6px; }
+  .edit .pmove { display: inline-flex; }
+  .pmove button { font: 11px var(--font); background: #1a1c1d; color: var(--fg); border: 1px solid var(--line); padding: 0 5px; cursor: pointer; }
+
   /* settings / log pages */
   .sheet { position: fixed; inset: 0; background: rgba(5,6,7,.85); display: none; justify-content: center; align-items: flex-start; padding: 50px 16px 24px; z-index: 5; overflow: auto; }
   .sheet.open { display: flex; }
   .sheet .panel { width: min(760px, 100%); }
-  .sheet .row2 { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
+  .row2 { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
 
   @media (max-width: 1100px) {
     html, body { overflow: auto; height: auto; }
@@ -177,6 +198,8 @@
     <span class="conn"><span class="cdot" id="connDot"></span><span id="connText">Connecting…</span></span>
     <nav class="tabs">
       <button class="on" id="tabHub">Hub</button>
+      <button id="tabBooks">Books</button>
+      <button id="tabLog">Log</button>
       <button id="tabSettings">Settings</button>
     </nav>
   </div>
@@ -184,20 +207,20 @@
   <div class="grid">
     <!-- LEFT -->
     <div class="col left">
-      <section class="panel">
-        <div class="ph"><h2>Opponent</h2></div>
-        <div class="pb"><div class="soon">Enemy tracking comes in a later build.</div></div>
+      <section class="panel" data-panel="opponent">
+        <div class="ph"><h2>Opponent</h2><span class="meta" id="oppMode"></span></div>
+        <div class="pb" id="opp"><div class="empty">No enemies around</div></div>
       </section>
-      <section class="panel grow">
+      <section class="panel grow" data-panel="party">
         <div class="ph"><h2>Party</h2><span class="meta num" id="partyCount"></span></div>
         <div class="pb"><div class="list" id="party"><div class="empty">No one with you</div></div></div>
       </section>
-      <section class="panel minipanel"><canvas id="miniMap"></canvas></section>
+      <section class="panel minipanel" data-panel="minimap"><canvas id="miniMap"></canvas></section>
     </div>
 
     <!-- CENTER -->
     <div class="col center">
-      <section class="panel mapp">
+      <section class="panel mapp" data-panel="map">
         <div class="maphead">
           <span class="loc" id="whereBig">—</span><span class="loc2" id="whereSmall"></span>
           <span class="when num" id="when"></span>
@@ -205,7 +228,11 @@
         </div>
         <div class="mapview">
           <canvas id="worldMap"></canvas>
+          <canvas id="localMap" style="display:none"></canvas>
+          <div class="mapnote" id="mapNote"></div>
           <div class="mapctl">
+            <button class="chipbtn on" id="btnWorld">World</button>
+            <button class="chipbtn" id="btnLocal">Local</button>
             <button class="chipbtn on" id="btnFollow">Follow</button>
             <button class="chipbtn" id="btnFit">Whole map</button>
             <button class="chipbtn" id="btnSpoil">Undiscovered</button>
@@ -215,15 +242,15 @@
         </div>
       </section>
       <div class="lowrow">
-        <section class="panel det"><div class="ph"><h2>Crosshair</h2></div><div class="pb" id="det"><div class="empty">Look at something</div></div></section>
-        <section class="panel alerts" id="alerts"><div class="ph"><h2>Alerts</h2><span class="meta">clears on load</span></div><div class="pb"><div class="list" id="events"><div class="empty">Nothing yet</div></div></div></section>
-        <section class="panel cal"><div class="ph"><h2 id="calMonth">Calendar</h2><span class="meta" id="calYear"></span></div><div class="pb" id="cal"></div></section>
+        <section class="panel det" data-panel="crosshair"><div class="ph"><h2>Crosshair</h2></div><div class="pb" id="det"><div class="empty">Look at something</div></div></section>
+        <section class="panel alerts" id="alerts" data-panel="alerts"><div class="ph"><h2>Alerts</h2><span class="meta">clears on load</span></div><div class="pb"><div class="list" id="events"><div class="empty">Nothing yet</div></div></div></section>
+        <section class="panel cal" data-panel="calendar"><div class="ph"><h2 id="calMonth">Calendar</h2><span class="meta" id="calYear"></span></div><div class="pb" id="cal"></div></section>
       </div>
     </div>
 
     <!-- RIGHT -->
     <div class="col right">
-      <section class="panel">
+      <section class="panel" data-panel="character">
         <div class="pb">
           <div class="charhead">
             <span class="charname" id="charName">—</span>
@@ -240,12 +267,12 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-panel="survival">
         <div class="ph"><h2>Survival</h2><span class="meta" id="ambient"></span></div>
         <div class="pb"><div class="surv" id="survival"><div class="empty">Survival Mode not detected</div></div><div class="prot" id="prot" style="display:none"><svg class="flame" id="flame" viewBox="0 0 30 36"></svg><div><div class="pct num" id="protPct"></div><div class="mute" style="font-size:11px">cold protection</div></div><div class="dim num" id="protInfo" style="margin-left:auto;font-size:12px;text-align:right"></div></div></div>
       </section>
 
-      <section class="panel eq">
+      <section class="panel eq" data-panel="equipment">
         <div class="ph"><h2>Equipment</h2><span class="meta num" id="armorRating"></span></div>
         <div class="pb">
           <div id="hands"></div>
@@ -258,11 +285,11 @@
       </section>
 
       <div class="split">
-        <section class="panel">
+        <section class="panel" data-panel="effects">
           <div class="ph"><h2>Effects</h2><span class="meta"><span class="key">/</span> abilities</span></div>
           <div class="pb"><div class="list" id="effects"><div class="empty">No active effects</div></div></div>
         </section>
-        <section class="panel">
+        <section class="panel" data-panel="supplies">
           <div class="ph"><h2>Supplies</h2></div>
           <div class="pb"><div class="list" id="consumables"><div class="empty">Nothing yet</div></div></div>
         </section>
@@ -273,7 +300,7 @@
 
 <div class="sheet" id="sheet">
   <section class="panel">
-    <div class="ph"><h2>Settings</h2><button class="chipbtn" id="sheetClose" style="margin-left:auto">Close</button></div>
+    <div class="ph"><h2 id="sheetTitle">Settings</h2><button class="chipbtn" id="sheetClose" style="margin-left:auto">Close</button></div>
     <div class="pb" id="sheetBody" style="overflow:auto"></div>
   </section>
 </div>
@@ -460,9 +487,10 @@
     const maxId = Math.max(...cmds.map(c => c.id));
     if (lastCmd === null) { lastCmd = maxId; return; }
     for (const c of cmds.filter(c => c.id > lastCmd).sort((a, b) => a.id - b.id)) {
-      if (c.cmd === "zoomIn") app.view.scale = clamp(app.view.scale * 1.5, .0006, .08);
-      else if (c.cmd === "zoomOut") app.view.scale = clamp(app.view.scale / 1.5, .0006, .08);
-      else if (c.cmd === "cycleView") { viewIdx = (viewIdx + 1) % VIEWS.length; const v = VIEWS[viewIdx]; setFollow(v.follow); if (v.whole) fitWorld(); else app.view.scale = v.scale; }
+      if (c.cmd === "zoomIn") { if (app.view_ === "local") app.localZoom = clamp(app.localZoom * 1.4, .5, 6); else app.view.scale = clamp(app.view.scale * 1.5, .0006, .08); }
+      else if (c.cmd === "zoomOut") { if (app.view_ === "local") app.localZoom = clamp(app.localZoom / 1.4, .5, 6); else app.view.scale = clamp(app.view.scale / 1.5, .0006, .08); }
+      else if (c.cmd === "cycleView") setView(app.view_ === "world" ? "local" : "world", true);
+      else if (c.cmd === "selectNext") selectNextEffect();
       else if (c.cmd === "toggleUndiscovered") { app.settings.spoilers = !app.settings.spoilers; store.set("settings", app.settings); syncSpoil(); }
       else if (c.cmd === "toggleAbilities") { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); }
     }
@@ -472,7 +500,7 @@
   function onState(s) {
     runCommands(s.commands);
     if (!s.ready) {
-      if (app.state) resetSession();
+      if (app.state) { resetSession(); local.data = null; local.version = 0; }
       app.state = null; setConn("wait", "Waiting for a loaded save…"); return;
     }
     $("banner").style.display = "none";
@@ -574,6 +602,13 @@
     }
     if (s && !s.where.interior) drawFollowers(ctx, W2S, s, t);
     if (s && app.shown && !s.where.interior) { const [x, y] = W2S(app.shown.x, app.shown.y); drawPlayer(ctx, x, y, app.shown.h, 13); }
+    const pin = app.findPin;
+    if (pin && Date.now() < pin.until && !pin.interior) {
+      const [x, y] = W2S(pin.x, pin.y), k = (t / 700) % 1, c = followerColor(pin.name);
+      ctx.save(); ctx.strokeStyle = c; ctx.globalAlpha = 1 - k; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 6 + k * 18, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.font = "13px " + FONT(); ctx.textAlign = "center"; ctx.lineWidth = 3; ctx.strokeStyle = "#000"; ctx.strokeText(pin.name, x, y - 12); ctx.fillStyle = "#fff"; ctx.fillText(pin.name, x, y - 12); ctx.restore();
+    }
   }
   let drag = null;
   function setFollow(on) { app.follow = on; $("btnFollow").classList.toggle("on", on); }
@@ -612,19 +647,28 @@
     ctx.save(); ctx.beginPath(); ctx.arc(w / 2, h / 2, R, 0, Math.PI * 2); ctx.clip();
     ctx.fillStyle = PAPER; ctx.fillRect(0, 0, w, h);
     if (s && app.shown) {
-      const indoors = s.where.interior, radius = 9000, scale = R / radius, cos = Math.cos(rot), sin = Math.sin(rot);
+      const radius = RADAR_RANGE, scale = R / radius, cos = Math.cos(rot), sin = Math.sin(rot);
       const toScreen = (x, y) => { const dx = (x - app.shown.x) * scale, dy = -(y - app.shown.y) * scale; return [dx * cos - dy * sin + w / 2, dx * sin + dy * cos + h / 2]; };
-      if (!indoors && app.mapInfo && app.mapImg && app.mapImg.ok) {
-        ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(rot);
-        const { span, cx, cy } = app.mapInfo, k = scale * span;
-        ctx.globalAlpha = .75; ctx.drawImage(app.mapImg.el, ((cx - span / 2) - app.shown.x) * scale, -((cy + span / 2) - app.shown.y) * scale, k, k); ctx.restore();
-      }
+      // Background: the local map floor plan around you; blank paper where there's no navmesh.
+      if (local.data && local.data.tris && local.data.tris.length) drawFloor(ctx, toScreen, { onlyNearZ: s.player.z, alpha: 1, paper: true, scale });
       if (s.player.inCombat) { const g = ctx.createRadialGradient(w / 2, h / 2, R * .55, w / 2, h / 2, R); g.addColorStop(0, "rgba(194,58,38,0)"); g.addColorStop(1, `rgba(194,58,38,${.35 + .15 * Math.sin(t / 250)})`); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
       if (s.player.sneaking) { const g = ctx.createRadialGradient(w / 2, h / 2, R * .3, w / 2, h / 2, R); g.addColorStop(0, "rgba(16,20,26,0)"); g.addColorStop(1, "rgba(16,20,26,.7)"); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+      // Radar blips: gray until close enough to know, red if hostile, rings for attackers you haven't seen.
+      for (const b of s.radar || []) {
+        const [x, y] = toScreen(b.x, b.y);
+        if (b.state === "ping") {
+          const k = (t / 900) % 1; ctx.strokeStyle = `rgba(224,80,64,${1 - k})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 5 + k * 14, 0, Math.PI * 2); ctx.stroke(); continue;
+        }
+        const col = b.dead ? "#5c5a55" : b.hostile ? "#e05040" : b.hostile === false ? "#d8d2c0" : "#8f8c85";
+        ctx.fillStyle = col; ctx.strokeStyle = "#111"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, b.state === "combat" ? 6 : 5, 0, Math.PI * 2);
+        if (b.state === "detected") { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); } else { ctx.fill(); ctx.stroke(); }
+        if (b.fight) { ctx.strokeStyle = "#e0a03a"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.stroke(); }
+        if (b.seesMe) { ctx.strokeStyle = "#f4efe2"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.ellipse(x, y - 13, 7, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = "#f4efe2"; ctx.beginPath(); ctx.arc(x, y - 13, 2, 0, Math.PI * 2); ctx.fill(); }
+      }
       drawFollowers(ctx, toScreen, s, t);
     }
     ctx.restore();
-    // compass ring
     ctx.strokeStyle = "#5a5e60"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(w / 2, h / 2, R + 1, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = "#202325"; ctx.lineWidth = ringW; ctx.beginPath(); ctx.arc(w / 2, h / 2, R + ringW / 2 + 2, 0, Math.PI * 2); ctx.stroke();
     ctx.font = "15px " + FONT(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -638,6 +682,7 @@
     drawPlayer(ctx, w / 2, h / 2, 0, 11);
   }
 
+
   // ---------- panels ----------
   const ordinal = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
   const fmtTime = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}h ${m}m` : m ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`; };
@@ -646,8 +691,9 @@
     const p = s.player, st = s.stats;
     $("charName").textContent = p.name || "—"; $("charLevel").textContent = p.level;
     $("gold").textContent = p.gold.toLocaleString() + " gold";
-    const set = (id, v) => { $(id).textContent = v ? Math.round(v.cur) : "–"; $(id + "m").textContent = v ? "/ " + Math.round(v.max) : ""; };
-    set("vH", st.health); set("vM", st.magicka); set("vS", st.stamina);
+    const ch = s.character || {};
+    const set = (id, v, sp) => { $(id).textContent = v ? Math.round(v.cur) : "–"; $(id + "m").textContent = v ? "/ " + Math.round(v.max) + (sp && sp.levels > 0 ? ` · +${sp.levels} lvls` : "") : ""; };
+    set("vH", st.health, ch.health); set("vM", st.magicka, ch.magicka); set("vS", st.stamina, ch.stamina);
     $("vH").style.color = st.health && st.health.max > 0 && st.health.cur / st.health.max < .3 ? "#ff3b28" : "";
     $("chipCombat").className = "chip" + (p.inCombat ? " on danger" : ""); $("chipSneak").className = "chip" + (p.sneaking ? " on" : ""); $("chipMount").className = "chip" + (p.mounted ? " on" : "");
   }
@@ -676,25 +722,68 @@
 
   function renderParty(list) {
     list = list || [];
-    $("partyCount").textContent = list.filter(f => !f.dead).length || "";
+    const alive = list.filter(f => !f.dead);
+    $("partyCount").textContent = alive.length || "";
     if (!list.length) { $("party").innerHTML = `<div class="empty">No one with you</div>`; return; }
     const pct = (v) => v && v.max > 0 ? clamp(v.cur / v.max, 0, 1) * 100 : 0;
-    const order = { "Downed": 0, "In combat": 1, "Following": 2, "Away": 3, "Dead": 4 };
-    const sorted = list.slice().sort((a, b) => (order[a.status] ?? 5) - (order[b.status] ?? 5) || a.name.localeCompare(b.name));
-    $("party").innerHTML = sorted.map(f => {
+    const order = { "Downed": 0, "In combat": 1, "Following": 2, "Waiting": 3, "Away": 4, "Dead": 5 };
+    const sorted = list.slice().sort((a, b) => (order[a.status] ?? 6) - (order[b.status] ?? 6) || a.name.localeCompare(b.name));
+    const card = (f) => {
       const cls = f.status === "Downed" || f.status === "Dead" ? "bad" : f.status === "In combat" ? "warn" : "";
       const dist = f.distance >= 0 ? Math.round(f.distance / 70) + " m away" : "";
       const where = f.sameSpace ? dist : (f.interior ? (f.cell || "Interior") : (f.location || f.cell || "Elsewhere"));
-      const low = pct(f.health) < 30 && !f.dead;
-      return `<div class="pcard ${f.dead ? "dead" : ""}">
+      const low = pct(f.health) < 30 && !f.dead, b = f.battle;
+      const battle = b ? [b.right, b.left].filter(Boolean).map(esc).join(" / ") + ` · Armor ${Math.round(b.armor)}` + (b.ammo ? ` · ${esc(b.ammo.name)} ${b.ammo.count}` : "") +
+        (b.spells && b.spells.length ? ` · ${b.spells.map(esc).join(", ")}` : "") + (b.carry ? ` · Carry ${Math.round(b.carry.cur)}/${Math.round(b.carry.max)}` : "") : "";
+      return `<div class="pcard ${f.dead ? "dead" : ""}" data-id="${f.id}">
         <div class="top"><span class="pdot" style="background:${followerColor(f.name)}"></span><span class="pname">${esc(f.name)}</span><span class="mute num" style="font-size:12px">${f.level}</span>
-        <span class="pst ${cls}">${esc(f.status)}${f.mounted ? " · mounted" : ""}</span></div>
+        ${f.essential ? '<span class="ess">ESSENTIAL</span>' : ""}<span class="pst ${cls}">${esc(f.status)}${f.mounted ? " · mounted" : ""}</span></div>
         <div class="mbars"><div class="bar"><i style="width:${pct(f.health)}%;background:${low ? "#ff3b28" : "var(--health)"}"></i></div>
         <div class="bar"><i style="width:${pct(f.magicka)}%;background:var(--magicka)"></i></div><div class="bar"><i style="width:${pct(f.stamina)}%;background:var(--stamina)"></i></div></div>
-        ${where ? `<div class="pline">${esc(where)}</div>` : ""}</div>`;
-    }).join("");
+        ${battle ? `<div class="pline">${battle}</div>` : ""}
+        <div class="pline">${esc(where)}${f.sameSpace ? "" : `<button class="pbtn" data-find="${f.id}">Find</button>`}</div></div>`;
+    };
+    const people = sorted.filter(f => !f.creature), beasts = sorted.filter(f => f.creature);
+    let html = people.map(card).join("");
+    if (beasts.length) html += `<div class="grp">Beasts and pets</div>` + beasts.map(card).join("");
+    const sl = app.state && app.state.partySlots;
+    if (sl && sl.tamed1 >= 0) {
+      const cap = 1 + Math.max(0, sl.packLeader || 0), used = (sl.tamed1 > 0 ? 1 : 0) + (sl.tamed2 > 0 ? 1 : 0);
+      const hunger = (h) => h >= 0 ? `${Math.round(h)}/6 hungry · leaves in about ${Math.max(0, 6 - Math.round(h)) * 15} game hours unless fed` : "";
+      if (used) html += `<div class="grp">Tamed · ${used} / ${cap}</div>` + [sl.tamed1 > 0 ? hunger(sl.pet1Hunger) : "", sl.tamed2 > 0 ? hunger(sl.pet2Hunger) : ""].filter(Boolean).map(x => `<div class="pline ${/[56]\/6/.test(x) ? "red" : ""}">${x}</div>`).join("");
+    }
+    $("party").innerHTML = html;
     fitList($("party"), "in party");
   }
+  $("party").addEventListener("click", (e) => {
+    const find = e.target.closest("[data-find]");
+    if (find) { e.stopPropagation(); findActor(+find.dataset.find); return; }
+    const c = e.target.closest(".pcard"); if (c) openFollower(+c.dataset.id);
+  });
+  async function findActor(id) {
+    try {
+      const r = await fetchJson("/api/find/" + id.toString(16));
+      if (r.error) return;
+      app.findPin = { ...r, until: Date.now() + 120000 };
+      addEvent(app.state, `${r.name}: ${r.where || "unknown"}${r.interior ? " (inside)" : ""}`);
+      if (!r.interior) { setView("world"); setFollow(false); app.view.x = r.x; app.view.y = r.y; }
+    } catch {}
+  }
+  async function openFollower(id) {
+    openSheet("Follower", `<div class="empty">Loading…</div>`);
+    try {
+      const r = await fetchJson("/api/follower/" + id.toString(16));
+      const items = (r.items || []).slice().sort((a, b) => (b.worn - a.worn) || a.name.localeCompare(b.name));
+      $("sheetTitle").textContent = r.name || "Follower";
+      $("sheetBody").innerHTML = `<div class="dim" style="margin-bottom:6px">${esc(r.where || "")}</div>
+        <div class="grp">In hand</div><div>${[r.right, r.left].filter(Boolean).map(esc).join(" / ") || "Nothing"}</div>
+        <div class="grp">Equipped</div>${items.filter(i => i.worn).map(i => `<div class="row2"><span>${esc(i.name)}</span></div>`).join("") || '<div class="empty">Nothing</div>'}
+        <div class="grp">Spells</div><div class="dim">${(r.spells || []).map(esc).join(", ") || "None"}</div>
+        <div class="grp">Inventory · ${items.length} items</div>` +
+        items.filter(i => !i.worn).map(i => `<div class="row2"><span>${esc(i.name)}</span><span class="mute num">${i.count > 1 ? "×" + i.count : ""}</span><span class="mute num" style="margin-left:auto">${(+i.weight).toFixed(1)} wt</span></div>`).join("");
+    } catch { $("sheetBody").innerHTML = `<div class="empty">Couldn't read that follower right now.</div>`; }
+  }
+
 
   const HUNGER = ["Well Fed", "Satisfied", "Peckish", "Hungry", "Famished", "Starving"];
   const COLD = ["Warm", "Comfortable", "Chilly", "Very Cold", "Freezing", "Numb"];
@@ -731,7 +820,7 @@
     const hand = (h, label) => {
       if (!h) return "";
       let right = "", extra = "";
-      if (h.kind === "weapon") { right = h.damage ? Math.round(h.damage) + " dmg" : ""; if (typeof h.charge === "number") extra = ` <span class="mute">${Math.round(h.charge)}%</span>`; }
+      if (h.kind === "weapon") { right = h.damage ? Math.round(h.damage) + " dmg" : ""; if (typeof h.charge === "number") extra = ` <span class="mute">${Math.round(h.charge)}%</span>`; if (h.poison) extra += ` <span class="goodc">· ${esc(h.poison.name)} ×${h.poison.doses}</span>`; }
       else if (h.kind === "spell") right = `<span class="mute">spell</span>`;
       else if (h.kind === "shield") right = Math.round(h.armor);
       const ench = h.enchant ? ` <span class="mute">· ${esc(h.enchant)}</span>` : "";
@@ -753,11 +842,12 @@
     if (e.caster && e.caster !== "You") txt += (txt ? " · " : "") + "from " + e.caster;
     return txt;
   }
-  function effectRow(e) {
-    const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed;
-    return `<div class="eff ${e.detrimental ? "bad" : ""}">${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
+  function effectRow(e, i) {
+    const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed, sel = i === selEffect;
+    const more = sel ? `<span class="effx">${timed ? `Running ${fmtTime(e.elapsed)} of ${fmtTime(e.dur)} · ${fmtTime(left)} left` : "No time limit"}${e.mag ? ` · magnitude ${Math.round(e.mag)}` : ""}${e.caster && e.caster !== "You" ? ` · from ${esc(e.caster)}` : ""}</span>` : "";
+    return `<div class="eff ${e.detrimental ? "bad" : ""} ${sel ? "sel" : ""}">${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
       <span class="nm">${esc(e.name)}${e.mag ? ` <span class="dim num">${Math.round(e.mag)}</span>` : ""}</span><span class="num dim">${timed ? fmtTime(left) : ""}</span>
-      <span class="src">${esc(effectSource(e))}</span></div>`;
+      <span class="src">${esc(effectSource(e))}</span>${more}</div>`;
   }
   function renderEffects(list) {
     const el = $("effects");
@@ -768,8 +858,9 @@
     const main = shown.filter(e => !isAbility(e)), abil = shown.filter(isAbility);
     main.sort((a, b) => (b.detrimental - a.detrimental) || ((a.dur > 1 ? a.dur - a.elapsed : 1e9) - (b.dur > 1 ? b.dur - b.elapsed : 1e9)) || a.name.localeCompare(b.name));
     abil.sort((a, b) => a.name.localeCompare(b.name));
-    let html = main.length ? main.map(effectRow).join("") : `<div class="empty">No active effects</div>`;
-    if (abil.length) { html += `<div class="grp" id="abilToggle" style="cursor:pointer;margin-top:6px">${abilitiesOpen ? "▾" : "▸"} Abilities · ${abil.length}</div>`; if (abilitiesOpen) html += abil.map(effectRow).join(""); }
+    if (selEffect >= main.length) selEffect = main.length ? -1 : -1;
+    let html = main.length ? main.map((e, i) => effectRow(e, i)).join("") : `<div class="empty">No active effects</div>`;
+    if (abil.length) { html += `<div class="grp" id="abilToggle" style="cursor:pointer;margin-top:6px">${abilitiesOpen ? "▾" : "▸"} Abilities · ${abil.length}</div>`; if (abilitiesOpen) html += abil.map(e => effectRow(e, -2)).join(""); }
     el.innerHTML = html; fitList(el, "effects");
     const t = $("abilToggle"); if (t) t.onclick = () => { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); renderEffects(list); };
   }
@@ -801,7 +892,7 @@
       r("B", "Magicka", tot.m[0], tot.m[1] ? "+" + Math.round(tot.m[1]) : "", tot.m[0] <= 2 ? "red" : "") +
       r("N", "Stamina", tot.s[0], tot.s[1] ? "+" + Math.round(tot.s[1]) : "", tot.s[0] <= 2 ? "red" : "") +
       `<div class="rule"></div>` + r("", "Cure Disease", cure) + r("", "Skooma", skooma, "", skooma > 0 ? "red" : "") +
-      `<div class="rule"></div>` + foodRows(food, sup, warmth) + r("", "Poisons", poison) + r("", "Other potions", other) + extrasRows(sup);
+      `<div class="rule"></div>` + foodRows(food, sup, warmth) + stressRows(list) + r("", "Poisons", poison) + r("", "Other potions", other) + extrasRows(sup);
     fitList(el, "rows");
   }
 
@@ -935,6 +1026,19 @@
     el.innerHTML = `<div class="kind">${esc(kind)}</div><div class="nm">${esc(c.name || "")}</div><div class="g2">${rows.join("")}</div>`;
   }
 
+  function stressRows(list) {
+    const st = app.state && app.state.stress;
+    const relief = list.filter(p => p.stress > 0), n = relief.reduce((a, p) => a + p.count, 0), total = relief.reduce((a, p) => a + p.count * p.stress, 0);
+    if (!st && !n) return "";
+    let html = "";
+    if (st && st.enabled) {
+      const pct = clamp(st.value / (st.max || 100), 0, 1);
+      html += `<div class="cons"><span></span><span>Stress</span><span class="cnt num ${pct >= .75 ? "red" : ""}">${Math.round(st.value)}</span><span class="num dim" style="font-size:12px">/ ${st.max || 100}</span></div>
+        <div class="bar" style="margin:1px 0 3px 30px"><i style="width:${pct * 100}%;background:${pct >= .75 ? "var(--bad)" : "#b48ad8"}"></i></div>`;
+    }
+    if (n) html += `<div class="cons"><span></span><span>Stress relief</span><span class="cnt num">${n}</span><span class="num dim" style="font-size:12px">−${total}</span></div>`;
+    return html;
+  }
   function foodRows(foodCount, sup, warmth) {
     const tiers = [0, 0, 0, 0], restore = (warmth && warmth.restore) || [0, 0, 0, 0];
     let hunger = 0;
@@ -963,26 +1067,231 @@
   let lastSlow = 0;
   function renderPanels(s) {
     renderCharacter(s); renderHeaderAndCalendar(s); renderParty(s.followers); renderEffects(s.effects); renderSurvival(s.survival);
-    runEvents(s); renderProgress(s.progress); renderWarmth(s.warmth, s.survival); renderDet(s.crosshair);
+    runEvents(s); renderProgress(s.progress); renderWarmth(s.warmth, s.survival); renderDet(s.crosshair); renderOpponent(s); autoView(s);
+    if (app.view_ === "world") $("mapNote").textContent = s.mapOpened === false && !app.demo ? "Open the map in game once to load markers" : "";
     if (Date.now() - lastSlow > 900) { lastSlow = Date.now(); renderEquipment(s.equipment); renderConsumables(s.consumables, s.supplies, s.warmth); renderQuest(s.quests); }
     const cd = $("shoutCd"); if (cd) cd.textContent = s.shoutCooldown > .5 ? Math.ceil(s.shoutCooldown) + " s" : "";
   }
   window.addEventListener("resize", () => { lastSlow = 0; if (app.state) renderPanels(app.state); renderEvents(); });
 
-  // ---------- settings page ----------
-  function openSettings() {
-    $("sheetBody").innerHTML = `<div class="grp">Hotkeys in game</div>` +
-      [["Num +", "Zoom in"], ["Num −", "Zoom out"], ["Num *", "Change map view"], ["Num .", "Show undiscovered markers"], ["Num /", "Show abilities"], ["V", "Health potion (Smart Optimal Salves)"], ["B", "Magicka potion"], ["N", "Stamina potion"]]
-        .map(k => `<div class="row2"><span class="key">${k[0]}</span><span>${k[1]}</span></div>`).join("") +
-      `<div class="grp" style="margin-top:12px">Skills to track</div><div id="skillPick">` +
-      ((app.state && app.state.progress && app.state.progress.skills) || []).map(x => `<label><input type="checkbox" value="${esc(x.name)}" ${(chosenSkills || []).includes(x.name) ? "checked" : ""}> ${esc(x.name)}</label>`).join("") +
-      `</div><div class="mute" style="font-size:12px">None ticked shows your four highest skills.</div>` +
-      `<div class="grp" style="margin-top:12px">Coming in later builds</div><div class="dim" style="font-size:13px">Party slots, opponent focus, layout editor, hidden effects, log folder.</div>`;
-    $("sheet").classList.add("open"); $("tabSettings").classList.add("on"); $("tabHub").classList.remove("on");
-    $("skillPick").onchange = () => { chosenSkills = [...$("skillPick").querySelectorAll("input:checked")].map(i => i.value); store.set("skills", chosenSkills); };
+  // ---------- local map (navmesh floor plan, explored parts only) ----------
+  const RADAR_RANGE = 6000;
+  const local = { data: null, version: 0, busy: false, bits: null };
+  async function pollLocal() {
+    if (app.demo || local.busy || !app.state) return;
+    local.busy = true;
+    try {
+      const r = await fetchJson("/api/localmap/" + local.version);
+      if (!r.same && r.version) { local.data = r; local.version = r.version; local.bits = decodeBits(r.explored || ""); }
+    } catch {} finally { local.busy = false; }
   }
-  function closeSheet() { $("sheet").classList.remove("open"); $("tabSettings").classList.remove("on"); $("tabHub").classList.add("on"); }
-  $("tabSettings").onclick = openSettings; $("tabHub").onclick = closeSheet; $("sheetClose").onclick = closeSheet;
+  function decodeBits(hex) { const out = new Uint8Array(hex.length * 4); for (let i = 0; i < hex.length; i++) { const v = parseInt(hex[i], 16); for (let b = 0; b < 4; b++) out[i * 4 + b] = (v >> b) & 1; } return out; }
+  // The explored bit string pads each navmesh to a multiple of 4 triangles; rebuild the per-triangle index.
+  function exploredFor(d) {
+    if (d._exploredIdx) return d._exploredIdx;
+    const n = d.tris.length / 3, idx = new Uint8Array(n);
+    // Without per-mesh sizes from the plugin, padding only shifts by <4 per mesh; treat bits in order.
+    for (let i = 0; i < n; i++) idx[i] = local.bits ? local.bits[i] : 0;
+    d._exploredIdx = idx; return idx;
+  }
+  function drawFloor(ctx, toScreen, opt) {
+    const d = local.data; if (!d) return;
+    const v = d.verts, tr = d.tris, ex = exploredFor(d);
+    ctx.save();
+    ctx.globalAlpha = opt.alpha;
+    ctx.fillStyle = opt.paper ? "rgba(70,60,45,.55)" : "rgba(150,175,180,.30)";
+    ctx.strokeStyle = opt.paper ? "rgba(60,50,35,.35)" : "rgba(190,210,215,.20)";
+    ctx.lineWidth = .5;
+    ctx.beginPath();
+    for (let i = 0; i < tr.length; i += 3) {
+      if (!ex[i / 3]) continue;
+      const a = tr[i] * 3, b = tr[i + 1] * 3, c = tr[i + 2] * 3;
+      if (opt.onlyNearZ !== undefined && Math.abs(v[a + 2] - opt.onlyNearZ) > 450) continue;
+      const [x1, y1] = toScreen(v[a], v[a + 1]), [x2, y2] = toScreen(v[b], v[b + 1]), [x3, y3] = toScreen(v[c], v[c + 1]);
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.closePath();
+    }
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  const localCv = $("localMap"), lctx = localCv.getContext("2d");
+  let localAlpha = store.get("localAlpha", .85);
+  function drawLocal() {
+    const w = localCv.clientWidth, h = localCv.clientHeight, s = app.state;
+    lctx.clearRect(0, 0, w, h);
+    lctx.fillStyle = `rgba(10,13,14,${localAlpha})`; lctx.fillRect(0, 0, w, h);
+    if (!s || !app.shown || !local.data || !local.data.tris) { $("mapNote").textContent = local.data ? "" : "Local map loads when you're in game"; return; }
+    // Fit the explored area, or a fixed window around you outdoors.
+    const d = local.data, v = d.verts, tr = d.tris, ex = exploredFor(d);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < tr.length; i += 3) { if (!ex[i / 3]) continue; for (let k = 0; k < 3; k++) { const a = tr[i + k] * 3; minX = Math.min(minX, v[a]); maxX = Math.max(maxX, v[a]); minY = Math.min(minY, v[a + 1]); maxY = Math.max(maxY, v[a + 1]); } }
+    if (!d.interior || !isFinite(minX)) { minX = app.shown.x - 7000; maxX = app.shown.x + 7000; minY = app.shown.y - 7000; maxY = app.shown.y + 7000; }
+    const pad = 400, sc = Math.min(w / (maxX - minX + pad * 2), h / (maxY - minY + pad * 2)) * app.localZoom, cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const toScreen = (x, y) => [(x - cx) * sc + w / 2, -(y - cy) * sc + h / 2];
+    drawFloor(lctx, toScreen, { alpha: 1 });
+    // Doors and location markers only, like the game's local map. No radar blips here.
+    lctx.fillStyle = "#d8b25a"; lctx.font = "12px " + FONT(); lctx.textAlign = "center";
+    for (const dr of d.doors || []) { const [x, y] = toScreen(dr.x, dr.y); lctx.fillRect(x - 3, y - 3, 6, 6); if (app.localZoom > 1.4 && dr.to) lctx.fillText(dr.to, x, y - 7); }
+    if (app.settings.localContainers !== false) { lctx.fillStyle = "#9a7a52"; for (const c of d.containers || []) { const [x, y] = toScreen(c.x, c.y); lctx.fillRect(x - 2, y - 2, 4, 4); } }
+    for (const o of d.ores || []) { const [x, y] = toScreen(o.x, o.y); lctx.fillStyle = o.depleted ? "#555" : "#b9c3c8"; lctx.beginPath(); lctx.moveTo(x, y - 4); lctx.lineTo(x + 4, y); lctx.lineTo(x, y + 4); lctx.lineTo(x - 4, y); lctx.closePath(); lctx.fill(); }
+    const [px, py] = toScreen(app.shown.x, app.shown.y); drawPlayer(lctx, px, py, app.shown.h, 11);
+    $("mapNote").textContent = d.interior ? (d.name || "Interior") + " · explored this session" : "Explored this session";
+  }
+  app.view_ = "world"; app.localZoom = 1; app.userView = null;
+  function setView(v, byUser) {
+    app.view_ = v; if (byUser) app.userView = v;
+    $("worldMap").style.display = v === "world" ? "" : "none"; localCv.style.display = v === "local" ? "" : "none";
+    $("btnWorld").classList.toggle("on", v === "world"); $("btnLocal").classList.toggle("on", v === "local");
+    if (v === "world") $("mapNote").textContent = "";
+  }
+  $("btnWorld").onclick = () => setView("world", true); $("btnLocal").onclick = () => setView("local", true);
+  let wasInterior = null;
+  function autoView(s) {
+    // The local map is always up indoors; outdoors you get the world map unless you picked otherwise.
+    const inside = !!(s.where && s.where.interior);
+    if (inside !== wasInterior) { wasInterior = inside; app.userView = null; setView(inside ? "local" : "world"); }
+  }
+
+  // ---------- opponent panel ----------
+  let focusMode = store.get("focusMode", "closest"), bestiaryCol = store.get("bestiaryCol", "vanilla");
+  function bestiaryTags(b) {
+    if (!b) return "";
+    const pick = (o) => (o && (o[bestiaryCol] && o[bestiaryCol].length ? o[bestiaryCol] : o.vanilla)) || [];
+    const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+    return pick(b.weakness).map(x => `<span class="tag weak">Weak: ${esc(cap(x))}</span>`).join("") + pick(b.resistance).map(x => `<span class="tag res">Resists: ${esc(cap(x))}</span>`).join("");
+  }
+  function renderOpponent(s) {
+    const el = $("opp");
+    const foes = (s.radar || []).filter(b => b.hostile && !b.dead && b.name);
+    const cross = s.crosshair && s.crosshair.kind === "actor" && s.crosshair.hostile && !s.crosshair.dead ? s.crosshair : null;
+    $("oppMode").textContent = cross ? "Crosshair" : focusMode === "strongest" ? "Strongest" : "Closest";
+    if (!foes.length && !cross) { el.innerHTML = `<div class="empty">No enemies around</div>`; return; }
+    const sorted = foes.slice().sort((a, b) => a.dist - b.dist);
+    let f = cross ? { name: cross.name, level: cross.level, hp: cross.health && cross.health.cur, hpMax: cross.health && cross.health.max, bestiary: cross.bestiary, dist: null } :
+      focusMode === "strongest" ? foes.slice().sort((a, b) => b.level - a.level || b.hpMax - a.hpMax)[0] : sorted[0];
+    const pct = f.hpMax > 0 ? clamp(f.hp / f.hpMax, 0, 1) * 100 : 0;
+    el.innerHTML = `<div class="opp"><div class="row2"><span class="nm">${esc(f.name)}</span><span class="dim" style="margin-left:auto">Lv ${f.level}</span></div>
+      <div class="bar" style="height:7px;margin-top:3px"><i style="width:${pct}%;background:var(--health)"></i></div>
+      <div class="orow"><span class="dim num">${Math.round(f.hp || 0)} / ${Math.round(f.hpMax || 0)}</span><span class="r mute num">${f.dist != null ? Math.round(f.dist / 70) + " m" : ""}</span></div>
+      <div>${bestiaryTags(f.bestiary)}</div></div>` +
+      (sorted.length > 1 || cross ? `<div class="rule"></div>` + sorted.slice(0, 6).map(b => `<div class="orow"><span>${esc(b.name)}</span><span class="mute num">${b.level}</span><span class="r dim num">${b.hpMax > 0 ? Math.round(b.hp / b.hpMax * 100) : 0}% · ${Math.round(b.dist / 70)} m</span></div>`).join("") : "");
+  }
+
+  // ---------- effects: NumPad 0 steps through them for details ----------
+  let selEffect = -1;
+  function selectNextEffect() { selEffect++; if (app.state) renderEffects(app.state.effects); }
+
+  // ---------- sheets: books, log, settings ----------
+  function openSheet(title, html, tab) {
+    $("sheetTitle").textContent = title; $("sheetBody").innerHTML = html; $("sheet").classList.add("open");
+    for (const id of ["tabHub", "tabBooks", "tabLog", "tabSettings"]) $(id).classList.toggle("on", id === (tab || "tabHub"));
+  }
+  function closeSheet() { $("sheet").classList.remove("open"); for (const id of ["tabBooks", "tabLog", "tabSettings"]) $(id).classList.remove("on"); $("tabHub").classList.add("on"); }
+  function bookGroup(b) { return b.quest ? "Quest items" : /\bmap\b/i.test(b.name) ? "Maps" : b.note ? "Notes and letters" : b.skill ? "Skill books" : "Books"; }
+  function openBooks() {
+    const books = (app.state && app.state.books) || [];
+    const groups = ["Quest items", "Notes and letters", "Maps", "Skill books", "Books"];
+    let html = books.length ? "" : `<div class="empty">No books, notes or maps on you.</div>`;
+    for (const g of groups) {
+      const items = books.filter(b => bookGroup(b) === g).sort((a, b) => a.name.localeCompare(b.name));
+      if (!items.length) continue;
+      html += `<details open><summary class="grp" style="cursor:pointer">${g} · ${items.length}</summary>` + items.map(b => `<div class="row2" data-book="${b.id}" style="cursor:pointer"><span>${esc(b.name)}</span>${b.skill ? `<span class="mute">${esc(b.skill)}</span>` : ""}<span class="${b.read ? "mute" : "goldc"}" style="margin-left:auto">${b.read ? "read" : "unread"}</span></div>`).join("") + `</details>`;
+    }
+    openSheet("Books", html + `<div id="bookView" style="margin-top:10px"></div>`, "tabBooks");
+    $("sheetBody").onclick = async (e) => {
+      const row = e.target.closest("[data-book]"); if (!row) return;
+      $("bookView").innerHTML = `<div class="empty">Opening…</div>`;
+      try { const r = await fetchJson("/api/book/" + (+row.dataset.book).toString(16)); $("bookView").innerHTML = `<div class="book"><h3 style="text-align:center;font-weight:400">${esc(r.name)}</h3>${bookHtml(r.text || "")}</div>`; $("bookView").scrollIntoView({ block: "nearest" }); }
+      catch { $("bookView").innerHTML = `<div class="empty">Couldn't open that one right now.</div>`; }
+    };
+  }
+  // Skyrim book text uses a small HTML subset. Keep only safe formatting tags.
+  function bookHtml(text) {
+    const src = text.replace(/\[pagebreak\]/gi, "<hr>").replace(/<img[^>]*>/gi, "<i>[picture]</i>").replace(/\r?\n/g, "<br>");
+    const doc = new DOMParser().parseFromString(`<div>${src}</div>`, "text/html");
+    const ok = new Set(["P", "BR", "B", "I", "U", "FONT", "HR", "DIV", "SPAN"]);
+    const walk = (node) => {
+      for (const c of [...node.childNodes]) {
+        if (c.nodeType === 1) {
+          if (!ok.has(c.tagName)) { c.replaceWith(...c.childNodes); continue; }
+          const align = c.getAttribute("align"), size = c.getAttribute("size"), color = c.getAttribute("color");
+          for (const a of [...c.attributes]) c.removeAttribute(a.name);
+          if (align && /^(left|right|center)$/i.test(align)) c.style.textAlign = align;
+          if (c.tagName === "FONT" && size && /^\d+$/.test(size)) c.style.fontSize = Math.max(11, Math.min(40, +size)) + "px";
+          if (c.tagName === "FONT" && color && /^#?[0-9a-f]{6}$/i.test(color)) c.style.color = color.startsWith("#") ? color : "#" + color;
+          walk(c);
+        }
+      }
+    };
+    walk(doc.body);
+    return doc.body.firstChild.innerHTML;
+  }
+  async function openLog() {
+    openSheet("Log", `<div class="empty">Loading…</div>`, "tabLog");
+    let text = "", folder = "";
+    try { const r = await fetch(BASE + "/api/log", { cache: "no-store" }); text = await r.text(); } catch {}
+    try { folder = (await fetchJson("/api/logfolder")).folder; } catch {}
+    const lines = text.trim().split(/\r?\n/).filter(Boolean).reverse();
+    $("sheetBody").innerHTML = `<div class="dim" style="font-size:12px;margin-bottom:6px">Saved in ${esc(folder || "Documents\\Skyrim Companion")} · newest first · open the file in Notepad any time</div>
+      <div class="logtext">${lines.length ? lines.map(esc).join("\n") : "Nothing logged yet. Deaths, hires and dismissals of followers show up here."}</div>`;
+  }
+
+  // ---------- layout: panel toggles and simple snap layout ----------
+  const PANELS = { opponent: "Opponent", party: "Party", minimap: "Mini map", map: "Map", crosshair: "Crosshair", alerts: "Alerts", calendar: "Calendar", character: "Character", survival: "Survival", equipment: "Equipment", effects: "Effects", supplies: "Supplies" };
+  let layout = Object.assign({ hidden: [], cols: [22, 50, 28] }, store.get("layout", {}));
+  function applyLayout() {
+    for (const [k] of Object.entries(PANELS)) { const el = document.querySelector(`[data-panel="${k}"]`); if (el) el.style.display = layout.hidden.includes(k) ? "none" : ""; }
+    const c = layout.cols; document.querySelector(".grid").style.gridTemplateColumns = window.innerWidth > 1100 ? `minmax(240px, ${c[0]}fr) minmax(0, ${c[1]}fr) minmax(280px, ${c[2]}fr)` : "";
+  }
+  applyLayout(); window.addEventListener("resize", applyLayout);
+
+  // ---------- settings ----------
+  async function openSettings() {
+    const s = app.state || {};
+    const sl = s.partySlots || {};
+    const names = (s.followers || []).map(f => f.name);
+    const hidden = (s.effects || []).filter(e => e.hidden && e.name);
+    let html = `<div class="grp">Hotkeys in game</div>` +
+      [["Num +", "Zoom map in"], ["Num −", "Zoom map out"], ["Num *", "Switch world / local map"], ["Num .", "Show undiscovered markers"], ["Num /", "Show abilities"], ["Num 0", "Step through active effects"], ["V", "Health potion (Smart Optimal Salves)"], ["B", "Magicka potion"], ["N", "Stamina potion"]]
+        .map(k => `<div class="row2"><span class="key">${k[0]}</span><span>${k[1]}</span></div>`).join("") + `<div id="hkMore"></div>`;
+    html += `<div class="grp" style="margin-top:12px">Skills to track</div><div id="skillPick">` +
+      ((s.progress && s.progress.skills) || []).map(x => `<label><input type="checkbox" value="${esc(x.name)}" ${(chosenSkills || []).includes(x.name) ? "checked" : ""}> ${esc(x.name)}</label>`).join("") +
+      `</div><div class="mute" style="font-size:12px">None ticked shows your four highest skills.</div>`;
+    html += `<div class="grp" style="margin-top:12px">Opponent focus</div>
+      <label><input type="radio" name="fm" value="closest" ${focusMode === "closest" ? "checked" : ""}> Closest</label><label><input type="radio" name="fm" value="strongest" ${focusMode === "strongest" ? "checked" : ""}> Strongest</label>
+      <span class="mute" style="font-size:12px">Your crosshair always takes over.</span>
+      <div style="margin-top:4px"><span class="dim">Bestiary weaknesses from:</span> ${["vanilla", "r&w", "kye2", "req"].map(c => `<label><input type="radio" name="bc" value="${c}" ${bestiaryCol === c ? "checked" : ""}> ${c === "vanilla" ? "Vanilla" : c === "r&w" ? "Resistances & Weaknesses" : c === "kye2" ? "KYE" : "Requiem"}</label>`).join("")}</div>`;
+    html += `<div class="grp" style="margin-top:12px">Party</div>
+      <div class="dim" style="font-size:13px">Vanilla follower ${sl.followers >= 0 ? Math.round(sl.followers) : "?"} / 1 · Animal ${sl.animals >= 0 ? Math.round(sl.animals) : "?"} / 1 · Tamed ${sl.tamed1 >= 0 ? (sl.tamed1 > 0) + (sl.tamed2 > 0) : "?"} / ${1 + Math.max(0, sl.packLeader || 0)} · Interesting NPCs and modded followers use their own systems</div>
+      <div id="colorPick">${names.map(n => `<label>${esc(n)} <input type="color" data-name="${esc(n)}" value="${followerColor(n)}"></label>`).join("") || '<span class="mute">No followers yet</span>'}</div>`;
+    html += `<div class="grp" style="margin-top:12px">Local map</div>
+      <label>Background <input type="range" id="lmAlpha" min="0.2" max="1" step="0.05" value="${localAlpha}"></label>
+      <label><input type="checkbox" id="lmCont" ${app.settings.localContainers !== false ? "checked" : ""}> Show containers</label>`;
+    html += `<div class="grp" style="margin-top:12px">Panels</div><div id="panelPick">` +
+      Object.entries(PANELS).map(([k, n]) => `<label><input type="checkbox" value="${k}" ${layout.hidden.includes(k) ? "" : "checked"}> ${n}</label>`).join("") + `</div>
+      <div style="margin-top:4px"><span class="dim">Column widths</span> ${[0, 1, 2].map(i => `<input type="range" class="colw" data-i="${i}" min="10" max="70" step="2" value="${layout.cols[i]}">`).join(" ")}</div>`;
+    html += `<div class="grp" style="margin-top:12px">Log folder</div>
+      <input type="text" id="logFolder" placeholder="C:\\Users\\You\\Documents\\Skyrim Companion"> <button class="chipbtn" id="logSave">Save</button> <span class="mute" id="logMsg"></span>`;
+    html += `<div class="grp" style="margin-top:12px">Hidden effects · ${hidden.length}</div><div class="dim" style="font-size:12px">${hidden.map(e => esc(e.name)).join(" · ") || "None right now"}</div>`;
+    openSheet("Settings", html, "tabSettings");
+    $("skillPick").onchange = () => { chosenSkills = [...$("skillPick").querySelectorAll("input:checked")].map(i => i.value); store.set("skills", chosenSkills); };
+    for (const r of document.getElementsByName("fm")) r.onchange = () => { focusMode = r.value; store.set("focusMode", focusMode); };
+    for (const r of document.getElementsByName("bc")) r.onchange = () => { bestiaryCol = r.value; store.set("bestiaryCol", bestiaryCol); };
+    for (const c of $("colorPick").querySelectorAll("input[type=color]")) c.oninput = () => { colorMap[c.dataset.name] = c.value; store.set("followerColors", colorMap); };
+    $("lmAlpha").oninput = () => { localAlpha = +$("lmAlpha").value; store.set("localAlpha", localAlpha); };
+    $("lmCont").onchange = () => { app.settings.localContainers = $("lmCont").checked; store.set("settings", app.settings); };
+    $("panelPick").onchange = () => { layout.hidden = [...$("panelPick").querySelectorAll("input")].filter(i => !i.checked).map(i => i.value); store.set("layout", layout); applyLayout(); };
+    for (const r of document.querySelectorAll(".colw")) r.oninput = () => { layout.cols[+r.dataset.i] = +r.value; store.set("layout", layout); applyLayout(); };
+    try { $("logFolder").value = (await fetchJson("/api/logfolder")).folder || ""; } catch {}
+    $("logSave").onclick = async () => {
+      try { const r = await fetchJson("/api/setlogfolder/" + encodeURIComponent($("logFolder").value.trim())); $("logMsg").textContent = r.ok ? "Saved" : r.error; } catch { $("logMsg").textContent = "Game not reachable"; }
+    };
+    try {
+      const hk = await fetchJson("/api/hotkeys"), keys = hk.keys || {};
+      const bound = Object.entries(keys).filter(([, v]) => v && v.label);
+      if (bound.length) $("hkMore").innerHTML = `<div class="mute" style="font-size:12px;margin-top:4px">From Hotkey Reminder:</div>` + bound.map(([k, v]) => `<div class="row2"><span class="key">${esc(k.toUpperCase())}</span><span>${esc(v.label)}</span></div>`).join("");
+    } catch {}
+  }
+  $("tabSettings").onclick = openSettings; $("tabBooks").onclick = openBooks; $("tabLog").onclick = openLog; $("tabHub").onclick = closeSheet; $("sheetClose").onclick = closeSheet;
   $("sheet").onclick = (e) => { if (e.target === $("sheet")) closeSheet(); };
 
   // ---------- demo (open with ?demo) ----------
@@ -1016,6 +1325,13 @@
         progress: { xp: 640, threshold: 1000, skills: ["One-handed", "Two-handed", "Archery", "Block", "Smithing", "Heavy Armor", "Light Armor", "Pickpocket", "Lockpicking", "Sneak", "Alchemy", "Speech", "Alteration", "Conjuration", "Destruction", "Illusion", "Restoration", "Enchanting"].map((n, i) => ({ name: n, level: 15 + (i * 7) % 40, xp: (i === 4 ? (t * 4000) % 300 : 120), threshold: 300 })) },
         warmth: { rating: 115, cap: 200, uiLevel: fight ? 0 : 1, restore: [15, 40, 90, 160] },
         shoutCooldown: fight ? 12 : 0,
+        radar: [{ id: 1, x: x + 1200, y: y + 800, dist: 1440, state: fight ? "combat" : "seen", name: "Draugr Wight", hostile: true, level: 20, hp: 288, hpMax: 400, seesMe: Math.sin(t * 5) > .6, bestiary: { creature: "draugr", weakness: { vanilla: ["fire"] }, resistance: { vanilla: ["frost"] } } },
+          { id: 2, x: x - 2500, y: y + 1500, dist: 2900, state: "seen", hostile: undefined }, { id: 3, x: x + 3000, y: y - 2000, dist: 3600, state: fight ? "ping" : "seen" }],
+        character: { health: { levels: 10 }, magicka: { levels: 3 }, stamina: { levels: 9 } },
+        stress: { value: 34, max: 100, enabled: true },
+        books: [{ id: 1, name: "Note from Lucan", quest: true, read: true }, { id: 2, name: "Heavy Armor Forging", skill: "Smithing", read: false }],
+        partySlots: { followers: 1, animals: 1, tamed1: 1, tamed2: 0, packLeader: 1, pet1Hunger: 2, pet2Hunger: 0 },
+        mapOpened: true,
         supplies: { lockpicks: 14, soulGems: [{ capacity: 1, soul: 0, count: 2, black: false }, { capacity: 5, soul: 3, count: 1, black: false }], food: [{ name: "Venison Stew", count: 4, tier: 3 }, { name: "Apple", count: 3, tier: 1 }], bounties: [{ faction: "Crime Faction Falkreath", bounty: 40 }] },
         quests: [{ quest: "Bleak Falls Barrow", text: "Find the Dragonstone", index: 10 }, { quest: "Bleak Falls Barrow", text: "Retrieve the Dragonstone", index: 20 }],
         crosshair: { name: "Steel War Axe", kind: "weapon", weaponType: 3, damage: 12, value: 55, weight: 13, owner: "Belethor", stealing: true, compare: { name: "Steel Sword", damage: 8 } },
@@ -1036,13 +1352,14 @@
       const p = app.state.player; app.shown.x += (p.x - app.shown.x) * .25; app.shown.y += (p.y - app.shown.y) * .25;
       const dh = ((p.heading - app.shown.h + 540) % 360) - 180; app.shown.h = (app.shown.h + dh * .3 + 360) % 360;
     }
-    fitCanvas(world); fitCanvas(mini); drawWorld(t); drawMini(t);
+    fitCanvas(mini); drawMini(t);
+    if (app.view_ === "local") { fitCanvas(localCv); drawLocal(); } else { fitCanvas(world); drawWorld(t); }
     requestAnimationFrame(frame);
   }
   (async () => {
     const demo = new URLSearchParams(location.search).has("demo"); if (demo) app.demo = true;
     await loadStatic();
-    if (demo) startDemo(); else { setInterval(pollState, 150); setInterval(pollMarkers, 5000); pollState(); pollMarkers(); }
+    if (demo) startDemo(); else { setInterval(pollState, 150); setInterval(pollMarkers, 5000); setInterval(pollLocal, 1500); pollState(); pollMarkers(); }
     requestAnimationFrame(frame);
   })();
 })();

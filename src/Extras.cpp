@@ -1,6 +1,7 @@
 #include "Extras.h"
 #include "Feed.h"
 #include "Readouts.h"
+#include "Radar.h"
 
 namespace companion::extras
 {
@@ -254,11 +255,13 @@ namespace companion::extras
 		if (const auto actor = ref->As<RE::Actor>(); actor) {
 			const auto owner = actor->AsActorValueOwner();
 			j["kind"] = "actor";
+			j["id"] = actor->GetFormID();
 			j["level"] = actor->GetLevel();
 			j["health"] = { { "cur", owner->GetActorValue(RE::ActorValue::kHealth) },
 				{ "max", owner->GetPermanentActorValue(RE::ActorValue::kHealth) + actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, RE::ActorValue::kHealth) } };
 			j["dead"] = actor->IsDead(false);
 			j["hostile"] = actor->IsHostileToActor(a_player);
+			j["bestiary"] = radar::Bestiary(actor);
 			return j;
 		}
 
