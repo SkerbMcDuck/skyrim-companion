@@ -195,17 +195,11 @@ namespace companion::feed
 
 	void Install()
 	{
-		if (const auto holder = RE::ScriptEventSourceHolder::GetSingleton(); holder) {
-			holder->AddEventSink<RE::TESContainerChangedEvent>(ContainerSink::Get());
-		}
-		Add(RE::SkillIncrease::GetEventSource(), SkillSink::Get(), "skill increase");
-		Add(RE::LevelIncrease::GetEventSource(), LevelSink::Get(), "level increase");
-		Add(RE::LocationDiscovery::GetEventSource(), DiscoverySink::Get(), "location discovery");
-		Add(SKSE::GetCrosshairRefEventSource(), CrosshairSink::Get(), "crosshair");
+		// Lean build: only the map-screen listener (markers load after the map is opened once).
 		if (const auto ui = RE::UI::GetSingleton(); ui) {
 			ui->AddEventSink<RE::MenuOpenCloseEvent>(MenuSink::Get());
 		}
-		logs::info("Event feed ready");
+		logs::info("Map listener ready");
 	}
 
 	json Recent()

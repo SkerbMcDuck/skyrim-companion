@@ -348,40 +348,52 @@ namespace companion::extras
 		return out;
 	}
 
+	// The journal: every quest with an objective on screen, grouped per quest.
+	// "active" is the journal's Active toggle (the quests whose markers the game shows).
 	json Quests(RE::PlayerCharacter* a_player)
 	{
 		json list = json::array();
+		std::unordered_map<RE::FormID, std::size_t> slot;
 		for (const auto& inst : a_player->GetPlayerRuntimeData().objectives) {
 			const auto obj = inst.Objective;
 			if (!obj || !obj->ownerQuest || inst.InstanceState != RE::QUEST_OBJECTIVE_STATE::kDisplayed) {
 				continue;
 			}
 			const auto quest = obj->ownerQuest;
-			if (!quest->IsActive()) {
+			if (quest->IsCompleted() || quest->IsStopped()) {
 				continue;
 			}
-			json j{ { "quest", Str(quest->GetFullName()) }, { "text", Str(obj->displayText.c_str()) }, { "index", obj->index } };
-			// Where the objective points, like the game's quest marker.
-			json targets = json::array();
-			for (std::uint32_t i = 0; i < obj->numTargets && obj->targets && i < 4; ++i) {
-				const auto target = obj->targets[i];
-				if (!target) {
-					continue;
-				}
-				RE::ObjectRefHandle handle;
-				target->GetTargetRef(handle, true, quest);
-				const auto ref = handle.get();
-				if (!ref) {
-					continue;
-				}
-				const auto pos = ref->GetPosition();
-				const auto cell = ref->GetParentCell();
-				const auto ws = ref->GetWorldspace();
-				targets.push_back({ { "x", pos.x }, { "y", pos.y }, { "worldspaceId", ws ? ws->GetFormID() : 0 },
-					{ "interior", cell && cell->IsInteriorCell() }, { "cell", cell ? Str(cell->GetName()) : "" } });
+			auto it = slot.find(quest->GetFormID());
+			if (it == slot.end()) {
+				it = slot.emplace(quest->GetFormID(), list.size()).first;
+				list.push_back({ { "id", quest->GetFormID() }, { "name", Str(quest->GetFullName()) }, { "active", quest->IsActive() },
+					{ "type", static_cast<int>(quest->GetType()) }, { "objectives", json::array() } });
 			}
-			j["targets"] = targets;
-			list.push_back(std::move(j));
+			json o{ { "text", Str(obj->displayText.c_str()) }, { "index", obj->index } };
+			if (quest->IsActive()) {
+				// Where the objective points, like the game's quest marker.
+				json targets = json::array();
+				for (std::uint32_t i = 0; i < obj->numTargets && obj->targets && i < 4; ++i) {
+					const auto target = obj->targets[i];
+					if (!target) {
+						continue;
+					}
+					RE::ObjectRefHandle handle;
+					target->GetTargetRef(handle, true, quest);
+					const auto ref = handle.get();
+					if (!ref) {
+						continue;
+					}
+					const auto pos = ref->GetPosition();
+					const auto cell = ref->GetParentCell();
+					const auto ws = ref->GetWorldspace();
+					targets.push_back({ { "x", pos.x }, { "y", pos.y }, { "worldspaceId", ws ? ws->GetFormID() : 0 },
+						{ "interior", cell && cell->IsInteriorCell() }, { "cellId", cell ? cell->GetFormID() : 0 },
+						{ "cell", cell ? Str(cell->GetName()) : "" } });
+				}
+				o["targets"] = targets;
+			}
+			list[it->second]["objectives"].push_back(std::move(o));
 		}
 		return list;
 	}

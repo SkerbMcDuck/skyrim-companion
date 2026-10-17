@@ -18,7 +18,6 @@ namespace companion::state
 		std::atomic<bool> g_rescanMarkers{ true };
 		std::atomic<bool> g_mapOpened{ false };  // markers load the first time the map screen opens
 		int               g_ticksSinceLocalMap = 0;
-		int               g_ticksSinceSeason = 290;
 
 		std::mutex  g_lock;
 		std::string g_stateJson = R"({"ready":false})";
@@ -81,6 +80,7 @@ namespace companion::state
 				{ "worldspace", worldspace ? SafeName(worldspace->GetName()) : "" },
 				{ "worldspaceEdid", worldspace ? SafeName(worldspace->GetFormEditorID()) : "" },
 				{ "cell", cell ? SafeName(cell->GetName()) : "" },
+				{ "cellId", cell ? cell->GetFormID() : 0 },
 				{ "interior", cell ? cell->IsInteriorCell() : false },
 				{ "location", location ? SafeName(location->GetName()) : "" }
 			};
@@ -182,36 +182,17 @@ namespace companion::state
 							return nullptr;
 						}
 					};
+					// Lean build: only what the hub shows (map, local map, quests, effects, level and skills).
 					state["effects"] = safely("Active effects", [&] { return readouts::ActiveEffects(player); });
-					state["survival"] = safely("Survival", [] { return readouts::Survival(); });
-					state["followers"] = safely("Followers", [&] { return readouts::Followers(player); });
 					state["progress"] = safely("Progress", [&] { return extras::Progress(player); });
-					state["warmth"] = safely("Warmth", [&] { return extras::Warmth(player); });
-					state["crosshair"] = safely("Crosshair", [&] { return extras::Crosshair(player); });
-					state["shoutCooldown"] = safely("Shout cooldown", [&] { return json(extras::ShoutCooldown(player)); });
-					state["radar"] = safely("Radar", [&] { return radar::Build(player); });
-					state["stress"] = safely("Stress", [] { return extras::Stress(); });
 					state["mapOpened"] = g_mapOpened.load();
-					if (++g_ticksSinceSeason >= 300) {
-						g_ticksSinceSeason = 0;
-						safely("Season", [] { extras::RequestSeason(); return json(nullptr); });
-					}
-					state["world"] = safely("World", [] { return extras::World(); });
 					if (++g_ticksSinceLocalMap >= 3) {
 						g_ticksSinceLocalMap = 0;
 						safely("Local map", [&] { localmap::Tick(player); return json(nullptr); });
 					}
 					if (++g_ticksSinceInventory >= 10) {
 						g_ticksSinceInventory = 0;
-						g_slowParts = {
-							{ "equipment", safely("Equipment", [&] { return readouts::Equipment(player); }) },
-							{ "consumables", safely("Consumables", [&] { return readouts::Consumables(player); }) },
-							{ "supplies", safely("Supplies", [&] { return extras::Supplies(player); }) },
-							{ "quests", safely("Quests", [&] { return extras::Quests(player); }) },
-							{ "books", safely("Books", [&] { return extras::Books(player); }) },
-							{ "character", safely("Character", [&] { return extras::Character(player); }) },
-							{ "partySlots", safely("Party slots", [] { return readouts::PartySlots(); }) }
-						};
+						g_slowParts = { { "quests", safely("Quests", [&] { return extras::Quests(player); }) } };
 					}
 					state.update(g_slowParts);
 					auto stateText = state.dump(-1, ' ', false, json::error_handler_t::replace);
@@ -249,9 +230,6 @@ namespace companion::state
 			feed::Clear();
 			radar::Reset();
 			localmap::Reset();
-			if (const auto player = RE::PlayerCharacter::GetSingleton(); player) {
-				textlog::Write(std::format("{} | Loaded a save: {}", textlog::GameDate(), player->GetName() ? player->GetName() : ""));
-			}
 		}
 		g_gameReady = a_ready;
 		g_rescanMarkers = true;  // a different save can have different markers

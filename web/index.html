@@ -6,130 +6,82 @@
 <title>Skyrim Companion</title>
 <style>
   @font-face { font-family: "Sovngarde"; src: url("assets/fonts/Sovngarde.ttf") format("truetype"); }
-  /* Layout (from the design review): left = opponent, party, mini map in the bottom-left corner (nearest the main screen);
-     center = world map with quest/location header, then crosshair / alerts / calendar; right = character, survival,
-     equipment, effects + supplies. One dark theme matched to SkyUI. */
+  /* Lean hub: world map in the middle, quest log + level/skills on the left, local map + active effects on the right. */
   :root {
-    --bg: #07090a;
-    --panel: rgba(16, 18, 19, .94);
-    --line: #3a3d3f;
-    --line-soft: #26292b;
-    --fg: #ece8df;
-    --fg-dim: #aaa69d;
-    --fg-mute: #77736b;
-    --health: #c23a26;
-    --magicka: #2f74c6;
-    --stamina: #4f9b3c;
-    --gold: #d8b25a;
-    --bad: #e05040;
-    --good: #84c26e;
-    --frost: #79b8e6;
-    --fire: #ef7a35;
-    --hunger: #c9a35a;
-    --fatigue: #9a8fc4;
+    --bg: #07090a; --panel: rgba(16, 18, 19, .94); --line: #3a3d3f; --line-soft: #26292b;
+    --fg: #ece8df; --fg-dim: #aaa69d; --fg-mute: #77736b; --gold: #d8b25a; --bad: #e05040; --good: #84c26e;
     --font: "Sovngarde", "Futura", "Century Gothic", "Segoe UI", sans-serif;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px/1.3 var(--font); overflow: hidden; }
   .app { height: 100%; display: grid; grid-template-rows: auto 1fr; gap: 6px; padding: 6px 8px 8px; }
-  .topbar { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
-  .brand { letter-spacing: .2em; text-transform: uppercase; font-size: 13px; color: var(--fg-dim); }
-  .conn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-mute); }
+  .topbar { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--line); padding-bottom: 4px; min-width: 0; }
+  .loc { font-size: 20px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .loc2 { font-size: 13px; color: var(--fg-dim); white-space: nowrap; }
+  .when { margin-left: auto; font-size: 13px; color: var(--fg-dim); white-space: nowrap; }
+  .conn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-mute); white-space: nowrap; }
   .cdot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
   .cdot.ok { background: var(--good); } .cdot.wait { background: var(--gold); } .cdot.bad { background: var(--bad); }
-  .tabs { margin-left: auto; display: flex; gap: 2px; }
-  .tabs button, .chipbtn { font: 13px var(--font); letter-spacing: .14em; text-transform: uppercase; background: transparent; color: var(--fg-dim);
-    border: 1px solid transparent; padding: 2px 10px; cursor: pointer; }
-  .tabs button:hover, .chipbtn:hover { color: var(--fg); border-color: var(--line); }
-  .tabs button.on { color: var(--fg); border-bottom-color: var(--fg); }
-  .chipbtn.on { color: var(--fg); border-color: var(--fg-dim); }
 
-  .grid { min-height: 0; display: grid; grid-template-columns: minmax(250px, 22fr) minmax(0, 50fr) minmax(300px, 28fr); gap: 6px; }
+  .grid { min-height: 0; display: grid; grid-template-columns: minmax(260px, 24fr) minmax(0, 50fr) minmax(280px, 26fr); gap: 6px; }
   .col { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
   .panel { background: var(--panel); border: 1px solid var(--line-soft); min-height: 0; min-width: 0; display: flex; flex-direction: column; flex: 0 0 auto; }
   .panel.grow { flex: 1 1 0; }
   .ph { display: flex; align-items: baseline; gap: 8px; padding: 5px 10px 4px; border-bottom: 1px solid var(--line-soft); }
   .ph h2 { margin: 0; font: 400 13px/1 var(--font); letter-spacing: .18em; text-transform: uppercase; color: var(--fg-dim); }
   .ph .meta { margin-left: auto; font-size: 12px; color: var(--fg-mute); white-space: nowrap; }
-  .pb { padding: 5px 10px 7px; min-height: 0; overflow: hidden; flex: 1 1 auto; display: flex; flex-direction: column; }
-  .list { min-height: 0; overflow: hidden; flex: 1 1 auto; }
+  .pb { padding: 6px 10px 8px; min-height: 0; overflow: auto; flex: 1 1 auto; scrollbar-width: thin; scrollbar-color: #333 transparent; }
   .num { font-variant-numeric: tabular-nums; }
-  .dim { color: var(--fg-dim); } .mute { color: var(--fg-mute); } .red { color: var(--bad); } .goldc { color: var(--gold); } .goodc { color: var(--good); }
+  .dim { color: var(--fg-dim); } .mute { color: var(--fg-mute); }
   .empty { color: var(--fg-mute); font-size: 13px; padding: 2px 0; }
-  .soon { color: var(--fg-mute); font-size: 12px; letter-spacing: .04em; }
-  .key { display: inline-block; min-width: 16px; padding: 0 4px; border: 1px solid var(--fg-mute); border-radius: 2px; font-size: 11px; line-height: 15px;
-    text-align: center; color: var(--fg-dim); }
-  .rule { border-top: 1px solid var(--line-soft); margin: 5px 0; }
-  .bar { height: 5px; background: #222527; position: relative; overflow: hidden; }
-  .bar > i { position: absolute; inset: 0 auto 0 0; display: block; }
-  .bar .tk { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,.85); }
-  .grp { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-mute); margin: 6px 0 2px; }
+  .grp { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-mute); margin: 10px 0 3px; }
   .grp:first-child { margin-top: 0; }
-  .more { font-size: 12px; color: var(--fg-mute); padding-top: 2px; }
+  .bar { height: 5px; background: #222527; position: relative; overflow: hidden; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; display: block; background: var(--fg-dim); }
+  .chipbtn { font: 12px var(--font); letter-spacing: .12em; text-transform: uppercase; background: rgba(8,10,11,.8); color: var(--fg-dim);
+    border: 1px solid var(--line); padding: 2px 9px; cursor: pointer; }
+  .chipbtn:hover { color: var(--fg); } .chipbtn.on { color: var(--fg); border-color: var(--fg-dim); }
 
-  /* party */
-  .pcard { padding: 4px 0; border-bottom: 1px solid var(--line-soft); }
-  .pcard:last-child { border-bottom: 0; }
-  .pcard .top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-  .pdot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
-  .pname { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pst { margin-left: auto; font-size: 12px; color: var(--fg-dim); white-space: nowrap; }
-  .pst.bad { color: var(--bad); } .pst.warn { color: var(--gold); }
-  .mbars { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3px; margin: 3px 0 2px; }
-  .pline { font-size: 12px; color: var(--fg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pcard.dead { opacity: .55; }
-  .minipanel { flex: none; display: flex; justify-content: center; padding: 4px; }
-  #miniMap { display: block; width: 100%; max-width: 300px; aspect-ratio: 1 / 1; height: auto; }
+  /* quest log */
+  .q { padding: 5px 0 6px; border-bottom: 1px solid var(--line-soft); }
+  .q:last-child { border-bottom: 0; }
+  .q .qn { font-size: 15px; }
+  .q.active .qn { color: var(--gold); }
+  .q .obj { font-size: 13px; color: var(--fg); padding-left: 14px; position: relative; margin-top: 2px; }
+  .q .obj::before { content: "\25C6"; position: absolute; left: 0; top: 1px; font-size: 9px; color: var(--gold); }
+  .q .obj.old { color: var(--fg-mute); }
+  .q .obj.old::before { color: var(--fg-mute); }
+  .q .where { font-size: 12px; color: var(--fg-dim); padding-left: 14px; }
+  .q.other .qn { font-size: 14px; color: var(--fg-dim); }
+  .q.other .obj { color: var(--fg-mute); font-size: 12px; }
+  .q.other .obj::before { color: var(--fg-mute); }
 
-  /* center */
-  .mapp { flex: 1 1 auto; }
-  .maphead { display: flex; flex-wrap: wrap; gap: 2px 14px; align-items: baseline; padding: 5px 10px; border-bottom: 1px solid var(--line-soft); }
-  .loc { font-size: 20px; letter-spacing: .06em; }
-  .loc2 { font-size: 13px; color: var(--fg-dim); }
-  .when { margin-left: auto; font-size: 13px; color: var(--fg-dim); text-align: right; }
-  .mapview { position: relative; flex: 1 1 auto; min-height: 200px; background: #000; }
-  #worldMap { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+  /* level + skills */
+  .lvl { display: flex; align-items: center; gap: 10px; }
+  .lvl .n { font-size: 26px; line-height: 1; }
+  .lvl .bar { flex: 1; height: 6px; } .lvl .bar > i { background: var(--fg); }
+  .lvl .pct { font-size: 12px; color: var(--fg-mute); }
+  .skills { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .sk { display: grid; grid-template-columns: 1fr 26px; gap: 1px 6px; align-items: center; font-size: 13px; padding: 2px 3px; }
+  .sk .bar { grid-column: 1 / 3; height: 3px; }
+  .sk.gain { background: rgba(216,178,90,.12); box-shadow: inset 2px 0 0 var(--gold); }
+  .sk.gain .bar > i { background: var(--gold); }
+
+  /* maps */
+  .mapview { position: relative; flex: 1 1 auto; min-height: 200px; background: #000; overflow: hidden; }
+  .mapview canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #worldMap { cursor: grab; }
   .mapctl { position: absolute; right: 8px; top: 8px; display: flex; gap: 4px; }
-  .mapctl .chipbtn { background: rgba(8,10,11,.8); }
+  .mapnote { position: absolute; left: 10px; bottom: 8px; font-size: 12px; color: var(--fg-dim); background: rgba(0,0,0,.6); padding: 2px 8px; pointer-events: none; }
+  .mapnote:empty { display: none; }
   .tooltip { position: absolute; pointer-events: none; background: rgba(0,0,0,.88); border: 1px solid var(--line); padding: 2px 8px; font-size: 13px; display: none; white-space: nowrap; }
   .banner { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); background: rgba(0,0,0,.92); border: 1px solid var(--gold);
     padding: 12px 16px; max-width: 520px; display: none; text-align: center; }
   .banner p { margin: 0 0 10px; }
-  .lowrow { display: grid; grid-template-columns: 1.1fr 1fr .9fr; gap: 6px; flex: 0 0 210px; min-height: 0; }
-  .alerts.flash { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 14px rgba(216,178,90,.35); }
-  .ev { display: flex; gap: 8px; font-size: 13px; padding: 1px 0; }
-  .ev .t { color: var(--fg-mute); font-size: 11px; min-width: 52px; padding-top: 2px; }
-  .ev.urgent { color: var(--bad); }
-  .cal table { border-collapse: collapse; width: 100%; font-size: 11px; text-align: center; }
-  .cal th { color: var(--fg-mute); font-weight: 400; padding: 1px; }
-  .cal td { padding: 1px; color: var(--fg-dim); }
-  .cal td.today { color: var(--bg); background: var(--fg); }
-  .cal td.hol { color: var(--gold); text-decoration: underline; }
-  .calfoot { font-size: 12px; color: var(--fg-dim); display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 4px; }
+  .localp { flex: 0 0 46%; }
 
-  /* right */
-  .charhead { display: flex; align-items: center; gap: 10px; }
-  .charname { font-size: 24px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lvring { position: relative; width: 34px; height: 34px; flex: none; }
-  .lvring svg { width: 34px; height: 34px; transform: rotate(-90deg); }
-  .lvring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 400; }
-  .goldcarry { margin-left: auto; text-align: right; font-size: 13px; white-space: nowrap; }
-  .vit { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; text-align: center; }
-  .vit .v { font-size: 24px; line-height: 1; }
-  .vit .l { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-mute); }
-  .vit .s { font-size: 11px; color: var(--fg-mute); }
-  .vh .v { color: #e3644e; } .vm .v { color: #5b98e0; } .vs .v { color: #79c062; }
-  .chips { display: flex; gap: 6px; margin-top: 6px; }
-  .chip { font-size: 11px; letter-spacing: .08em; padding: 1px 7px; border: 1px solid var(--line); color: var(--fg-mute); text-transform: uppercase; }
-  .chip.on { color: var(--fg); border-color: var(--fg-dim); } .chip.on.danger { color: #fff; border-color: var(--bad); background: rgba(224,80,64,.22); }
-  .surv { display: grid; grid-template-columns: 60px 1fr; gap: 1px 8px; align-items: center; font-size: 13px; }
-  .surv .st { grid-column: 2; font-size: 12px; color: var(--fg-dim); margin-bottom: 3px; }
-  .eq .row { display: flex; align-items: baseline; gap: 8px; font-size: 13px; padding: 1px 0; min-width: 0; }
-  .eq .slot { color: var(--fg-mute); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; min-width: 46px; flex: none; }
-  .eq .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .eq .r { margin-left: auto; white-space: nowrap; }
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: 1 1 0; min-height: 0; }
-  .eff { display: grid; grid-template-columns: 22px 1fr auto; gap: 0 6px; align-items: center; font-size: 13px; padding: 2px 0; }
+  /* effects */
+  .eff { display: grid; grid-template-columns: 22px 1fr auto; gap: 0 6px; align-items: center; font-size: 13px; padding: 3px 0; }
   .eff .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .eff .src { grid-column: 2 / 4; font-size: 11px; color: var(--fg-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .eff.bad .nm { color: #ffb3aa; }
@@ -137,51 +89,7 @@
   .ico img { width: 100%; height: 100%; object-fit: contain; }
   .ico .emb { position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; }
   .ico.fallback { border: 1px solid var(--line); border-radius: 50%; }
-  .cons { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 0 8px; align-items: center; font-size: 13px; padding: 1px 0; }
-  .cons .cnt { min-width: 22px; text-align: right; }
-
-  .quest { flex-basis: 100%; font-size: 13px; display: flex; gap: 4px 12px; flex-wrap: wrap; }
-  .quest b { font-weight: 400; color: var(--gold); }
-  .quest .obj::before { content: "\25C6  "; color: var(--gold); font-size: 9px; }
-  .quest .old { color: var(--fg-mute); }
-  .skill { display: grid; grid-template-columns: 92px 26px 1fr; gap: 6px; align-items: center; font-size: 13px; padding: 1px 2px; }
-  .skill.gain { background: rgba(216,178,90,.12); box-shadow: inset 2px 0 0 var(--gold); }
-  .prot { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
-  .prot .pct { font-size: 22px; line-height: 1; }
-  .flame { width: 26px; height: 32px; flex: none; }
-  .det .nm { font-size: 18px; letter-spacing: .03em; }
-  .det .kind { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--fg-mute); }
-  .det .g2 { display: grid; grid-template-columns: auto 1fr; gap: 1px 12px; font-size: 13px; margin-top: 4px; }
-  .det .g2 > span:nth-child(odd) { color: var(--fg-dim); }
-  .sheet label { display: inline-flex; gap: 6px; align-items: center; margin: 2px 14px 2px 0; font-size: 13px; }
-
-  #localMap { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .mapnote { position: absolute; left: 10px; bottom: 8px; font-size: 12px; color: var(--fg-dim); background: rgba(0,0,0,.6); padding: 2px 8px; pointer-events: none; }
-  .mapnote:empty { display: none; }
-  .opp .nm { font-size: 18px; letter-spacing: .03em; }
-  .tag { display: inline-block; font-size: 12px; border: 1px solid var(--line); padding: 0 6px; margin: 3px 4px 0 0; color: var(--fg-dim); }
-  .tag.weak { color: var(--fire); border-color: #6b3a1e; } .tag.res { color: var(--frost); border-color: #2b4a60; }
-  .orow { display: flex; gap: 8px; font-size: 13px; padding: 1px 0; } .orow .r { margin-left: auto; }
-  .pcard { cursor: pointer; } .pcard:hover .pname { color: #fff; }
-  .ess { font-size: 10px; letter-spacing: .1em; color: var(--gold); border: 1px solid #5a4a22; padding: 0 3px; }
-  .pbtn { font: 11px var(--font); letter-spacing: .1em; text-transform: uppercase; background: transparent; color: var(--fg-dim); border: 1px solid var(--line); padding: 0 6px; cursor: pointer; margin-left: 6px; }
-  .eff.sel { background: rgba(216,178,90,.12); box-shadow: inset 2px 0 0 var(--gold); }
-  .effx { grid-column: 2 / 4; font-size: 12px; color: var(--fg-dim); }
-  .book { font-family: Georgia, "Times New Roman", serif; background: #e6dbc0; color: #2c241a; padding: 22px 28px; line-height: 1.55; font-size: 15px; max-height: 60vh; overflow: auto; }
-  .book hr { border: 0; border-top: 1px dashed #9a8a6a; margin: 18px 0; }
-  .logtext { font-family: Consolas, monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; color: var(--fg-dim); max-height: 60vh; overflow: auto; }
-  .sheet input[type=text] { font: 13px var(--font); background: #111; color: var(--fg); border: 1px solid var(--line); padding: 3px 6px; width: 420px; max-width: 100%; }
-  .edit .panel[data-panel] { outline: 1px dashed var(--gold); cursor: grab; }
-  .edit .panel.dragover { outline: 2px solid var(--gold); }
-  .pmove { display: none; gap: 2px; margin-left: 6px; }
-  .edit .pmove { display: inline-flex; }
-  .pmove button { font: 11px var(--font); background: #1a1c1d; color: var(--fg); border: 1px solid var(--line); padding: 0 5px; cursor: pointer; }
-
-  /* settings / log pages */
-  .sheet { position: fixed; inset: 36px 0 0 0; background: rgba(5,6,7,.85); display: none; justify-content: center; align-items: flex-start; padding: 14px 16px 24px; z-index: 5; overflow: auto; }
-  .sheet.open { display: flex; }
-  .sheet .panel { width: min(760px, 100%); }
-  .row2 { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
+  .toggle { cursor: pointer; user-select: none; }
 
   @media (max-width: 1100px) {
     html, body { overflow: auto; height: auto; }
@@ -189,53 +97,39 @@
     .grid { grid-template-columns: 1fr; }
     .col.center { order: -1; }
     .mapview { min-height: 60vh; }
-    .lowrow { grid-template-columns: 1fr; flex: none; }
-    .list, .pb { overflow: visible; }
+    .localp { flex: none; }
+    .localp .mapview { min-height: 50vh; }
   }
 </style>
 </head>
 <body>
 <div class="app">
   <div class="topbar">
-    <span class="brand">Skyrim Companion</span>
+    <span class="loc" id="whereBig">Skyrim Companion</span><span class="loc2" id="whereSmall"></span>
+    <span class="when num" id="when"></span>
     <span class="conn"><span class="cdot" id="connDot"></span><span id="connText">Connecting…</span></span>
-    <nav class="tabs">
-      <button class="on" id="tabHub">Hub</button>
-      <button id="tabBooks">Books</button>
-      <button id="tabLog">Log</button>
-      <button id="tabSettings">Settings</button>
-    </nav>
   </div>
-
   <div class="grid">
-    <!-- LEFT -->
-    <div class="col left" id="colL">
-      <section class="panel" data-panel="opponent">
-        <div class="ph"><h2>Opponent</h2><span class="meta" id="oppMode"></span></div>
-        <div class="pb" id="opp"><div class="empty">No enemies around</div></div>
+    <div class="col left">
+      <section class="panel grow">
+        <div class="ph"><h2>Quests</h2><span class="meta num" id="questCount"></span></div>
+        <div class="pb" id="quests"><div class="empty">No quests yet</div></div>
       </section>
-      <section class="panel grow" data-panel="party">
-        <div class="ph"><h2>Party</h2><span class="meta num" id="partyCount"></span></div>
-        <div class="pb"><div class="list" id="party"><div class="empty">No one with you</div></div></div>
+      <section class="panel">
+        <div class="ph"><h2>Level and skills</h2></div>
+        <div class="pb">
+          <div class="lvl"><span class="n num" id="level">–</span><div class="bar"><i id="lvFill" style="width:0"></i></div><span class="pct num" id="lvPct"></span></div>
+          <div id="skills" style="margin-top:8px"></div>
+        </div>
       </section>
-      <section class="panel minipanel" data-panel="minimap"><canvas id="miniMap"></canvas></section>
     </div>
 
-    <!-- CENTER -->
-    <div class="col center" id="colC">
-      <section class="panel mapp" data-panel="map">
-        <div class="maphead">
-          <span class="loc" id="whereBig">—</span><span class="loc2" id="whereSmall"></span>
-          <span class="when num" id="when"></span>
-          <div class="quest" id="quest"></div>
-        </div>
+    <div class="col center">
+      <section class="panel grow">
         <div class="mapview">
           <canvas id="worldMap"></canvas>
-          <canvas id="localMap" style="display:none"></canvas>
           <div class="mapnote" id="mapNote"></div>
           <div class="mapctl">
-            <button class="chipbtn on" id="btnWorld">World</button>
-            <button class="chipbtn" id="btnLocal">Local</button>
             <button class="chipbtn on" id="btnFollow">Follow</button>
             <button class="chipbtn" id="btnFit">Whole map</button>
             <button class="chipbtn" id="btnSpoil">Undiscovered</button>
@@ -244,69 +138,19 @@
           <div class="tooltip" id="tooltip"></div>
         </div>
       </section>
-      <div class="lowrow" id="lowRow">
-        <section class="panel det" data-panel="crosshair"><div class="ph"><h2>Crosshair</h2></div><div class="pb" id="det"><div class="empty">Look at something</div></div></section>
-        <section class="panel alerts" id="alerts" data-panel="alerts"><div class="ph"><h2>Alerts</h2><span class="meta">clears on load</span></div><div class="pb"><div class="list" id="events"><div class="empty">Nothing yet</div></div></div></section>
-        <section class="panel cal" data-panel="calendar"><div class="ph"><h2 id="calMonth">Calendar</h2><span class="meta" id="calYear"></span></div><div class="pb" id="cal"></div></section>
-      </div>
     </div>
 
-    <!-- RIGHT -->
-    <div class="col right" id="colR">
-      <section class="panel" data-panel="character">
-        <div class="pb">
-          <div class="charhead">
-            <span class="charname" id="charName">—</span>
-            <span class="lvring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#2a2d2f" stroke-width="3"/><circle id="lvArc" cx="18" cy="18" r="15" fill="none" stroke="#ece8df" stroke-width="3" stroke-dasharray="94.25" stroke-dashoffset="94.25"/></svg><b id="charLevel">–</b></span>
-            <span class="goldcarry"><span class="goldc num" id="gold"></span><br><span class="dim num" id="carryTop"></span></span>
-          </div>
-          <div class="vit">
-            <div class="vh"><div class="v num" id="vH">–</div><div class="l">Health</div><div class="s num" id="vHm"></div></div>
-            <div class="vm"><div class="v num" id="vM">–</div><div class="l">Magicka</div><div class="s num" id="vMm"></div></div>
-            <div class="vs"><div class="v num" id="vS">–</div><div class="l">Stamina</div><div class="s num" id="vSm"></div></div>
-          </div>
-          <div class="chips"><span class="chip" id="chipCombat">Combat</span><span class="chip" id="chipSneak">Sneaking</span><span class="chip" id="chipMount">Mounted</span></div>
-          <div id="skills" style="margin-top:6px"></div>
-        </div>
+    <div class="col right">
+      <section class="panel localp">
+        <div class="ph"><h2>Local map</h2><span class="meta" id="localName"></span></div>
+        <div class="mapview"><canvas id="localMap"></canvas><div class="mapnote" id="localNote"></div></div>
       </section>
-
-      <section class="panel" data-panel="survival">
-        <div class="ph"><h2>Survival</h2><span class="meta" id="ambient"></span></div>
-        <div class="pb"><div class="surv" id="survival"><div class="empty">Survival Mode not detected</div></div><div class="prot" id="prot" style="display:none"><svg class="flame" id="flame" viewBox="0 0 30 36"></svg><div><div class="pct num" id="protPct"></div><div class="mute" style="font-size:11px">cold protection</div></div><div class="dim num" id="protInfo" style="margin-left:auto;font-size:12px;text-align:right"></div></div></div>
+      <section class="panel grow">
+        <div class="ph"><h2>Active effects</h2><span class="meta num" id="effCount"></span></div>
+        <div class="pb" id="effects"><div class="empty">No active effects</div></div>
       </section>
-
-      <section class="panel eq" data-panel="equipment">
-        <div class="ph"><h2>Equipment</h2><span class="meta num" id="armorRating"></span></div>
-        <div class="pb">
-          <div id="hands"></div>
-          <div class="rule"></div>
-          <div id="worn"></div>
-          <div class="row" style="font-size:12px"><span class="dim num" id="resists"></span></div>
-          <div class="row" style="font-size:12px"><span class="dim">Carry</span><span class="r num dim" id="carryText"></span></div>
-          <div class="bar"><i id="carryFill" style="width:0;background:var(--fg-dim)"></i></div>
-        </div>
-      </section>
-
-      <div class="split" id="splitRow">
-        <section class="panel" data-panel="effects">
-          <div class="ph"><h2>Effects</h2><span class="meta"><span class="key">/</span> abilities</span></div>
-          <div class="pb"><div class="list" id="effects"><div class="empty">No active effects</div></div></div>
-        </section>
-        <section class="panel" data-panel="supplies">
-          <div class="ph"><h2>Supplies</h2></div>
-          <div class="pb"><div class="list" id="consumables"><div class="empty">Nothing yet</div></div></div>
-        </section>
-      </div>
     </div>
   </div>
-</div>
-
-<button class="chipbtn" id="editDone" style="display:none;position:fixed;right:16px;bottom:16px;z-index:6;background:#1a1c1d;border-color:var(--gold);color:var(--gold)">Done editing layout</button>
-<div class="sheet" id="sheet">
-  <section class="panel">
-    <div class="ph"><h2 id="sheetTitle">Settings</h2><button class="chipbtn" id="sheetClose" style="margin-left:auto">Close</button></div>
-    <div class="pb" id="sheetBody" style="overflow:auto"></div>
-  </section>
 </div>
 
 <script>
@@ -315,9 +159,10 @@
   const $ = (id) => document.getElementById(id);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const clean = (x) => String(x || "").replace(/<[^>]*>/g, "").trim();
   const store = {
-    get(k, d) { try { const v = localStorage.getItem("sc3." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem("sc3." + k, JSON.stringify(v)); } catch {} }
+    get(k, d) { try { const v = localStorage.getItem("sc4." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("sc4." + k, JSON.stringify(v)); } catch {} }
   };
   const BASE = location.protocol.startsWith("http") ? "" : "http://localhost:7171";
   const ASSETS = "assets/";
@@ -326,17 +171,11 @@
   const imgCache = new Map();
   function img(path) {
     let e = imgCache.get(path);
-    if (!e) {
-      e = { el: new Image(), ok: false, failed: false };
-      e.el.onload = () => { e.ok = true; };
-      e.el.onerror = () => { e.failed = true; };
-      e.el.src = ASSETS + path;
-      imgCache.set(path, e);
-    }
+    if (!e) { e = { el: new Image(), ok: false }; e.el.onload = () => { e.ok = true; }; e.el.src = ASSETS + path; imgCache.set(path, e); }
     return e;
   }
 
-  // ---------- map marker icons (CoMAP / Map Marker Framework) ----------
+  // ---------- map marker icons (CoMAP / Map Marker Framework configs) ----------
   const iconDefs = new Map(), refIcons = new Map(), typeScale = new Map();
   const normRef = (r) => { const [p, id] = String(r).split("|"); return p && id ? p.trim().toLowerCase() + "|" + parseInt(id, 16).toString(16) : ""; };
   function stripJsonComments(text) {
@@ -373,11 +212,10 @@
     else { const type = assign && typeof assign.icon === "number" ? assign.icon : m.type; if (type >= 1 && type <= 59) { file = "CoMAP " + type + (m.discovered ? "" : " Undiscovered"); scale = typeScale.get(type) || 1; } }
     return file ? { e: img("markers/" + safeFile(file) + ".png"), scale } : null;
   }
-  const CITY = new Set([1]), TOWN = new Set([2, 3, 54]);
   function drawMarker(ctx, x, y, m, size) {
     const ic = markerIcon(m);
     if (ic && ic.e.ok) { const s = size * Math.min(1.6, ic.scale); ctx.save(); ctx.globalAlpha = m.discovered ? 1 : .75; ctx.drawImage(ic.e.el, x - s / 2, y - s / 2, s, s); ctx.restore(); return; }
-    const r = CITY.has(m.type) ? size * .42 : TOWN.has(m.type) ? size * .34 : size * .26;
+    const r = m.type === 1 ? size * .42 : [2, 3, 54].includes(m.type) ? size * .34 : size * .26;
     ctx.save(); ctx.globalAlpha = m.discovered ? 1 : .5; ctx.fillStyle = "#2a241b"; ctx.strokeStyle = "#e9dcc0"; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.restore();
   }
@@ -386,46 +224,136 @@
     ctx.beginPath(); ctx.moveTo(0, -size); ctx.lineTo(size * .68, size * .78); ctx.lineTo(0, size * .38); ctx.lineTo(-size * .68, size * .78); ctx.closePath();
     ctx.fillStyle = "#f6efd9"; ctx.strokeStyle = "#1a140c"; ctx.lineWidth = 2.5; ctx.fill(); ctx.stroke(); ctx.restore();
   }
-
-  // ---------- party colors and follower dots ----------
-  const PALETTE = ["#e7c35a", "#5fc0c8", "#c58a5a", "#b48ad8", "#8fcf6a", "#e48aa0", "#a4a9b4", "#e09a4a"];
-  const colorMap = store.get("followerColors", {});
-  function followerColor(name) {
-    if (!colorMap[name]) { colorMap[name] = PALETTE[Object.keys(colorMap).length % PALETTE.length]; store.set("followerColors", colorMap); }
-    return colorMap[name];
+  function drawQuestDiamond(ctx, x, y, t) {
+    const k = 6 + Math.sin(t / 300);
+    ctx.save(); ctx.fillStyle = "#d8b25a"; ctx.strokeStyle = "#1a140c"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x, y - k * 1.6); ctx.lineTo(x + k, y); ctx.lineTo(x, y + k * 1.6); ctx.lineTo(x - k, y); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
   }
-  const shapeMap = store.get("followerShapes", {});
-  const followerShape = (name) => shapeMap[name] || "dot";
-  const deathSpots = new Map(); // name -> {x,y,ws}, until the next load
-  function drawFollowers(ctx, toScreen, s, t) {
-    for (const f of (s.followers || [])) {
-      const c = followerColor(f.name);
-      if (f.dead) {
-        const d = deathSpots.get(f.name); if (!d || d.ws !== s.where.worldspaceId || s.where.interior) continue;
-        const [x, y] = toScreen(d.x, d.y); ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(x - 5, y - 5); ctx.lineTo(x + 5, y + 5); ctx.moveTo(x + 5, y - 5); ctx.lineTo(x - 5, y + 5); ctx.stroke(); ctx.restore();
-        continue;
-      }
-      if (!f.sameSpace) continue;
-      const [x, y] = toScreen(f.x, f.y);
-      ctx.save();
-      if (f.status === "Downed") {
-        ctx.fillStyle = c; ctx.font = `700 ${Math.round(20 + 4 * Math.sin(t / 160))}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.lineWidth = 3; ctx.strokeStyle = "#000"; ctx.strokeText("!", x, y); ctx.fillText("!", x, y);
-      } else {
-        ctx.fillStyle = c; ctx.strokeStyle = "#10140c"; ctx.lineWidth = 2; ctx.beginPath();
-        const sh = followerShape(f.name), r = 5.5;
-        if (sh === "diamond") { ctx.moveTo(x, y - r * 1.3); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r * 1.3); ctx.lineTo(x - r, y); ctx.closePath(); }
-        else if (sh === "square") ctx.rect(x - r, y - r, r * 2, r * 2);
-        else if (sh === "triangle") { ctx.moveTo(x, y - r * 1.3); ctx.lineTo(x + r * 1.2, y + r); ctx.lineTo(x - r * 1.2, y + r); ctx.closePath(); }
-        else ctx.arc(x, y, r - .5, 0, Math.PI * 2);
-        ctx.fill(); ctx.stroke();
-      }
-      ctx.restore();
+  // Canvas pixels follow the element size (sharp on any monitor).
+  function fitCanvas(cv) {
+    const r = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * r) || cv.height !== Math.round(h * r)) { cv.width = Math.round(w * r); cv.height = Math.round(h * r); }
+    cv.getContext("2d").setTransform(r, 0, 0, r, 0, 0);
+  }
+
+  // ---------- state ----------
+  const app = { demo: false, state: null, shown: null, markers: [], worldspace: 0, mapInfo: null, mapImg: null, follow: true,
+    view: { x: 0, y: 0, scale: .005 }, spoilers: store.get("spoilers", false), maps: null };
+  let failures = 0, inflight = false;
+  async function fetchJson(path) { const r = await fetch(BASE + path, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); }
+  async function pollState() {
+    if (app.demo || inflight) return; inflight = true;
+    try { const s = await fetchJson("/api/state"); failures = 0; onState(s); }
+    catch { failures++; if (failures === 15) showOffline(); setConn("bad", "Game not reachable"); }
+    finally { inflight = false; }
+  }
+  async function pollMarkers() { if (!app.demo) try { onMarkers(await fetchJson("/api/markers")); } catch {} }
+  function setConn(k, t) { $("connDot").className = "cdot " + k; $("connText").textContent = t; }
+  function showOffline() {
+    const b = $("banner");
+    b.innerHTML = "<p>Can't reach the game. Start Skyrim through SKSE with Skyrim Companion installed and this page connects by itself.</p>";
+    b.style.display = "block";
+  }
+  async function loadStatic() {
+    try { app.maps = await (await fetch(ASSETS + "map/maps.json", { cache: "no-store" })).json(); } catch { app.maps = {}; }
+    if (!app.demo) { try { loadMarkerConfigs(await fetchJson("/api/mapmarker-configs")); } catch {} }
+  }
+
+  // In-game hotkeys (zoom) arrive as numbered commands.
+  let lastCmd = null;
+  function runCommands(cmds) {
+    if (!cmds || !cmds.length) return;
+    const maxId = Math.max(...cmds.map(c => c.id));
+    if (lastCmd === null) { lastCmd = maxId; return; }
+    for (const c of cmds.filter(c => c.id > lastCmd)) {
+      if (c.cmd === "zoomIn") app.view.scale = clamp(app.view.scale * 1.5, .0006, .08);
+      else if (c.cmd === "zoomOut") app.view.scale = clamp(app.view.scale / 1.5, .0006, .08);
+      else if (c.cmd === "toggleUndiscovered") setSpoil(!app.spoilers);
     }
+    lastCmd = Math.max(lastCmd, maxId);
   }
 
-  // ---------- SkyUI effect icon rules ----------
+  let lastSlow = 0;
+  function onState(s) {
+    runCommands(s.commands);
+    if (!s.ready) { if (app.state) { local.data = null; local.version = 0; } app.state = null; setConn("wait", "Waiting for a loaded save…"); return; }
+    $("banner").style.display = "none";
+    setConn("ok", app.demo ? "Demo" : "Live");
+    const prev = app.state; app.state = s;
+    if (!app.shown || (prev && Math.hypot(s.player.x - prev.player.x, s.player.y - prev.player.y) > 3000)) app.shown = { x: s.player.x, y: s.player.y, h: s.player.heading };
+    const ws = s.where.worldspaceId;
+    if (ws && ws !== app.worldspace) { app.worldspace = ws; selectMap(s.where.worldspaceEdid); }
+    renderHeader(s); renderProgress(s.progress); renderEffects(s.effects);
+    $("mapNote").textContent = s.mapOpened === false && !app.demo ? "Open the map in game once to load the markers" : "";
+    if (Date.now() - lastSlow > 900) { lastSlow = Date.now(); renderQuests(s.quests); }
+  }
+  function onMarkers(m) { const first = !app.markers.length; app.markers = m.markers || []; if (first && app.markers.length && !app.follow) fitWorld(); }
+  function selectMap(edid) {
+    const key = app.maps && Object.keys(app.maps).find(k => k.toLowerCase() === String(edid || "").toLowerCase());
+    const info = key ? app.maps[key] : null; app.mapInfo = info || null; app.mapImg = info ? img(info.image) : null;
+  }
+
+  // ---------- header ----------
+  const ordinal = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+  function gameTime(s) {
+    if (!s || !s.time) return "";
+    const hr = s.time.hour, H = Math.floor(hr), M = Math.floor((hr - H) * 60);
+    return ((H + 11) % 12 + 1) + ":" + String(M).padStart(2, "0") + (H < 12 ? " AM" : " PM");
+  }
+  function renderHeader(s) {
+    const wh = s.where;
+    $("whereBig").textContent = wh.interior ? (wh.cell || "Interior") : (wh.location || wh.worldspace || "Wilderness");
+    $("whereSmall").textContent = wh.interior ? (wh.location && wh.location !== wh.cell ? wh.location : "") : (wh.location && wh.worldspace && wh.location !== wh.worldspace ? wh.worldspace : "");
+    const tm = s.time; $("when").textContent = tm ? `${tm.dayName}, ${ordinal(tm.day)} of ${tm.month}, 4E ${tm.year} · ${gameTime(s)}` : "";
+  }
+
+  // ---------- quest log ----------
+  // Active quests (the journal's Active toggle) first with every objective; the rest show their latest objective.
+  function renderQuests(qs) {
+    const el = $("quests"); qs = qs || [];
+    $("questCount").textContent = qs.length ? qs.length + (qs.length === 1 ? " quest" : " quests") : "";
+    if (!qs.length) { el.innerHTML = `<div class="empty">No quests yet</div>`; return; }
+    const act = qs.filter(q => q.active), rest = qs.filter(q => !q.active);
+    let html = "";
+    if (act.length) {
+      html += `<div class="grp">Active</div>`;
+      for (const q of act) {
+        const objs = (q.objectives || []).slice().reverse();
+        const inside = objs.length && (objs[0].targets || []).find(t => t.interior && t.cell);
+        html += `<div class="q active"><div class="qn">${esc(q.name)}</div>` +
+          objs.map((o, i) => `<div class="obj ${i ? "old" : ""}">${esc(clean(o.text))}</div>`).join("") +
+          (inside ? `<div class="where">in ${esc(inside.cell)}</div>` : "") + `</div>`;
+      }
+    }
+    if (rest.length) {
+      html += `<div class="grp">Other quests</div>`;
+      for (const q of rest) {
+        const o = (q.objectives || [])[(q.objectives || []).length - 1];
+        html += `<div class="q other"><div class="qn">${esc(q.name)}</div>${o ? `<div class="obj">${esc(clean(o.text))}</div>` : ""}</div>`;
+      }
+    }
+    el.innerHTML = html;
+  }
+  const activeTargets = (s) => { const out = []; for (const q of (s && s.quests) || []) if (q.active) for (const o of q.objectives || []) for (const t of o.targets || []) out.push(t); return out; };
+
+  // ---------- level and skills ----------
+  const GROUPS = [["Combat", 0], ["Stealth", 6], ["Magic", 12]];
+  const skillXp = new Map(), skillLv = new Map(), skillGlow = new Map();
+  function renderProgress(pr) {
+    if (!pr) return;
+    const s = app.state, frac = pr.threshold > 0 ? clamp(pr.xp / pr.threshold, 0, 1) : 0;
+    $("level").textContent = s ? s.player.level : "–"; $("lvFill").style.width = (frac * 100) + "%"; $("lvPct").textContent = Math.floor(frac * 100) + "% to next";
+    const now = Date.now(), sk = pr.skills || [];
+    for (const x of sk) {
+      if (skillXp.has(x.name) && (x.xp > skillXp.get(x.name) + 1e-4 || x.level > skillLv.get(x.name))) skillGlow.set(x.name, now + 3000);
+      skillXp.set(x.name, x.xp); skillLv.set(x.name, x.level);
+    }
+    const row = (x) => { const f = x.threshold > 0 ? clamp(x.xp / x.threshold, 0, 1) : 0, g = (skillGlow.get(x.name) || 0) > now;
+      return `<div class="sk ${g ? "gain" : ""}"><span>${esc(x.name)}</span><span class="num dim" style="text-align:right">${Math.round(x.level)}</span><div class="bar"><i style="width:${f * 100}%"></i></div></div>`; };
+    $("skills").innerHTML = GROUPS.map(([name, i]) => `<div class="grp">${name}</div><div class="skills">${sk.slice(i, i + 6).map(row).join("")}</div>`).join("");
+  }
+
+  // ---------- active effects (SkyUI icon rules) ----------
   const ARCH = { 10: "conjure", 11: "invisibility", 12: "light", 17: "bound_item", 18: "conjure", 21: "paralysis", 25: "clairvoyance", 35: "cloak", 36: "werewolf", 37: "slow_time", 39: "ench_weapon", 41: "ethereal", 46: "vampire" };
   const AVI = {};
   ["av_skill_weapon_1h", "av_skill_weapon_2h", "av_skill_archery", "av_skill_block", "av_skill_smithing", "av_skill_armor_heavy", "av_skill_armor_light", "av_skill_pickpocket", "av_skill_lockpicking", "av_skill_sneak",
@@ -448,165 +376,60 @@
     return `<div class="ico"><img src="${ASSETS}${esc(path)}" alt="" onerror="this.parentNode.classList.add('fallback');this.remove()">` +
       (emblemPath ? `<img class="emb" src="${ASSETS}${esc(emblemPath)}" alt="" onerror="this.remove()">` : "") + `</div>`;
   }
-  function potionIcon(p) {
-    if (p.kind === "poison") return "potion_poison"; if (p.kind === "food") return "default_food";
-    const e = mainEffect(p); if (!e) return "default_potion";
-    if ([24, 27, 155].includes(e.av)) return "potion_health"; if ([25, 28, 156].includes(e.av)) return "potion_magic"; if ([26, 29, 157].includes(e.av)) return "potion_stam";
-    return "default_potion";
+  const fmtTime = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}h ${m}m` : m ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`; };
+  const SPELLTYPE = { 0: "Spell", 1: "Disease", 2: "Power", 3: "Lesser power", 4: "Ability", 5: "Poison", 6: "Enchantment", 7: "Potion", 8: "Ingredient", 10: "Addiction", 11: "Shout", 12: "Staff", 13: "Scroll" };
+  function effectSource(e) {
+    const kind = SPELLTYPE[e.spellType] || "", parts = [];
+    if (e.spellType === 6 && e.item) parts.push(e.item); else if (e.spell && e.spell !== e.name) parts.push(e.spell); else if (e.item) parts.push(e.item);
+    let txt = kind ? kind + (parts.length ? ": " + parts.join(", ") : "") : parts.join(", ");
+    if (e.caster && e.caster !== "You") txt += (txt ? " · " : "") + "from " + e.caster;
+    return txt;
   }
-
-  // Shows as many rows as fit and replaces the rest with "+N more", so nothing needs scrolling.
-  function fitList(el, noun) {
-    if (!el || window.innerWidth <= 1100) return;
-    const rows = () => [...el.children].filter(c => !c.classList.contains("more"));
-    let hidden = 0, guard = 200;
-    while (el.scrollHeight > el.clientHeight + 1 && guard-- > 0) {
-      const r = rows(); const last = r[r.length - 1]; if (!last || r.length <= 1) break;
-      last.remove(); if (!last.classList.contains("grp")) hidden++;
-      let m = el.querySelector(".more"); if (!m) { m = document.createElement("div"); m.className = "more"; el.appendChild(m); }
-      m.textContent = `+${hidden} more ${noun}`;
-    }
-    const r = rows(); if (r.length && r[r.length - 1].classList.contains("grp")) r[r.length - 1].remove();
+  function effectRow(e) {
+    const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed;
+    return `<div class="eff ${e.detrimental ? "bad" : ""}">${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
+      <span class="nm">${esc(e.name)}${e.mag ? ` <span class="dim num">${Math.round(e.mag)}</span>` : ""}</span><span class="num dim">${timed ? fmtTime(left) : ""}</span>
+      <span class="src">${esc(effectSource(e))}</span></div>`;
   }
-
-  // ---------- state ----------
-  const app = { demo: false, state: null, shown: null, markers: [], worldspace: 0, mapInfo: null, mapImg: null, follow: true,
-    view: { x: 0, y: 0, scale: .005 }, settings: Object.assign({ spoilers: false }, store.get("settings", {})), maps: null };
-
-  let failures = 0, inflight = false;
-  async function fetchJson(path) { const r = await fetch(BASE + path, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); }
-  async function pollState() {
-    if (app.demo || inflight) return; inflight = true;
-    try { const s = await fetchJson("/api/state"); failures = 0; onState(s); }
-    catch { failures++; if (failures === 15) showOffline(); setConn("bad", "Game not reachable"); }
-    finally { inflight = false; }
-  }
-  async function pollMarkers() { if (!app.demo) try { onMarkers(await fetchJson("/api/markers")); } catch {} }
-  function setConn(k, t) { $("connDot").className = "cdot " + k; $("connText").textContent = t; }
-  function showOffline() {
-    const b = $("banner");
-    b.innerHTML = "<p>Can't reach the game. Start Skyrim through SKSE with Skyrim Companion installed and this page connects by itself.</p><button class='chipbtn' id='btnDemo'>Try demo mode</button>";
-    b.style.display = "block"; $("btnDemo").onclick = startDemo;
-  }
-  async function loadStatic() {
-    try { app.maps = await (await fetch(ASSETS + "map/maps.json", { cache: "no-store" })).json(); } catch { app.maps = {}; }
-    if (!app.demo) { try { loadMarkerConfigs(await fetchJson("/api/mapmarker-configs")); } catch {} }
-  }
-
-  // In-game hotkeys arrive as numbered commands.
-  let lastCmd = null, viewIdx = 0, abilitiesOpen = store.get("abilitiesOpen", false);
-  const VIEWS = [{ follow: true, scale: .012 }, { follow: true, scale: .004 }, { follow: false, whole: true }];
-  function runCommands(cmds) {
-    if (!cmds || !cmds.length) return;
-    const maxId = Math.max(...cmds.map(c => c.id));
-    if (lastCmd === null) { lastCmd = maxId; return; }
-    for (const c of cmds.filter(c => c.id > lastCmd).sort((a, b) => a.id - b.id)) {
-      if (c.cmd === "zoomIn") { if (app.view_ === "local") app.localZoom = clamp(app.localZoom * 1.4, .5, 6); else app.view.scale = clamp(app.view.scale * 1.5, .0006, .08); }
-      else if (c.cmd === "zoomOut") { if (app.view_ === "local") app.localZoom = clamp(app.localZoom / 1.4, .5, 6); else app.view.scale = clamp(app.view.scale / 1.5, .0006, .08); }
-      else if (c.cmd === "cycleView") setView(app.view_ === "world" ? "local" : "world", true);
-      else if (c.cmd === "selectNext") selectNextEffect();
-      else if (c.cmd === "toggleUndiscovered") { app.settings.spoilers = !app.settings.spoilers; store.set("settings", app.settings); syncSpoil(); }
-      else if (c.cmd === "toggleAbilities") { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); }
-    }
-    lastCmd = Math.max(lastCmd, maxId);
-  }
-
-  function onState(s) {
-    runCommands(s.commands);
-    if (!s.ready) {
-      if (app.state) { resetSession(); local.data = null; local.version = 0; }
-      app.state = null; setConn("wait", "Waiting for a loaded save…"); return;
-    }
-    $("banner").style.display = "none";
-    setConn("ok", app.demo ? "Demo mode" : "Live");
-    const prev = app.state; app.state = s;
-    if (!app.shown || (prev && Math.hypot(s.player.x - prev.player.x, s.player.y - prev.player.y) > 3000)) app.shown = { x: s.player.x, y: s.player.y, h: s.player.heading };
-    const ws = s.where.worldspaceId;
-    if (ws && ws !== app.worldspace) { app.worldspace = ws; selectMap(s.where.worldspaceEdid); }
-    watchAlerts(prev, s);
-    renderPanels(s);
-  }
-  function onMarkers(m) { const first = !app.markers.length; app.markers = m.markers || []; if (first && app.markers.length && !app.follow) fitWorld(); }
-  function selectMap(edid) { const key = app.maps && Object.keys(app.maps).find(k => k.toLowerCase() === String(edid || "").toLowerCase()); const info = key ? app.maps[key] : null; app.mapInfo = info || null; app.mapImg = info ? img(info.image) : null; }
-
-  // ---------- alerts (built from what the hub already sees; cleared on every load) ----------
-  const events = [];
-  function resetSession() { events.length = 0; deathSpots.clear(); renderEvents(); }
-  function gameTime(s) {
-    if (!s || !s.time) return "";
-    const hr = s.time.hour, H = Math.floor(hr), M = Math.floor((hr - H) * 60);
-    return ((H + 11) % 12 + 1) + ":" + String(M).padStart(2, "0") + (H < 12 ? " AM" : " PM");
-  }
-  function addEvent(s, text, urgent) {
-    events.unshift({ t: gameTime(s), text, urgent: !!urgent });
-    if (events.length > 60) events.pop();
-    renderEvents();
-    const a = $("alerts"); a.classList.add("flash"); clearTimeout(a._t); a._t = setTimeout(() => a.classList.remove("flash"), 1800);
-  }
-  function renderEvents() {
-    const el = $("events");
-    el.innerHTML = events.length ? events.map(e => `<div class="ev ${e.urgent ? "urgent" : ""}"><span class="t num">${esc(e.t)}</span><span>${esc(e.text)}</span></div>`).join("") : `<div class="empty">Nothing yet</div>`;
-    fitList(el, "alerts");
-  }
-  const restoreCounts = (s) => { const c = { h: 0, m: 0, s: 0 }; for (const p of s.consumables || []) { const k = restoreKind(p); if (k) c[k] += p.count; } return c; };
-  function watchAlerts(prev, s) {
-    if (!prev) return;
-    const p0 = prev.player, p1 = s.player;
-    if (p1.inCombat && !p0.inCombat) addEvent(s, "Combat started", true);
-    if (!p1.inCombat && p0.inCombat) addEvent(s, "Combat ended");
-    const loc0 = prev.where.interior ? prev.where.cell : prev.where.location, loc1 = s.where.interior ? s.where.cell : s.where.location;
-    if (loc1 && loc1 !== loc0) addEvent(s, "Entered " + loc1);
-    const hp = s.stats.health; if (hp.max > 0 && hp.cur / hp.max < .25 && prev.stats.health.cur / prev.stats.health.max >= .25) addEvent(s, "Health low", true);
-    const old = new Map((prev.followers || []).map(f => [f.name, f]));
-    for (const f of s.followers || []) {
-      const o = old.get(f.name);
-      if (!o) { addEvent(s, `${f.name} joined you`); continue; }
-      if (f.status === "Downed" && o.status !== "Downed") addEvent(s, `${f.name} is down`, true);
-      if (f.dead && !o.dead) { addEvent(s, `${f.name} died`, true); deathSpots.set(f.name, { x: o.x, y: o.y, ws: o.worldspaceId }); }
-    }
-    for (const o of prev.followers || []) if (!(s.followers || []).some(f => f.name === o.name)) addEvent(s, `${o.name} left your service`);
-    if (prev.consumables && s.consumables) {
-      const a = restoreCounts(prev), b = restoreCounts(s);
-      for (const [k, n] of [["h", "Health"], ["m", "Magicka"], ["s", "Stamina"]]) if (b[k] <= 2 && a[k] > 2) addEvent(s, `${n} potions low (${b[k]} left)`, true);
-    }
-    if (s.equipment && prev.equipment && s.equipment.carry && prev.equipment.carry) {
-      const over = (e) => e.carry.cur > e.carry.max;
-      if (over(s.equipment) && !over(prev.equipment)) addEvent(s, "Over-encumbered", true);
-    }
-    if (prev.quests && s.quests) {
-      const had = new Set(prev.quests.map(q => q.quest + "|" + q.text));
-      for (const q of s.quests) if (!had.has(q.quest + "|" + q.text)) addEvent(s, `Quest: ${cleanText(q.text)}`);
-    }
-    const sv0 = prev.survival, sv1 = s.survival;
-    if (sv0 && sv1) for (const [k, names] of [["hunger", HUNGER], ["cold", COLD], ["fatigue", FATIGUE]]) {
-      if (sv0[k] && sv1[k]) { const a = stageFrom(sv0[k]), b = stageFrom(sv1[k]); if (b > a) addEvent(s, `${sv1[k].name}: ${names[b] || "worse"}`, b >= 3); }
-    }
+  let abilitiesOpen = store.get("abilitiesOpen", false), lastEffKey = "";
+  function renderEffects(list) {
+    const all = (list || []).filter(e => e.name && !e.hidden && !e.inactive);
+    const seen = new Set(), shown = [];
+    for (const e of all) { const k = e.name + "|" + e.spell + "|" + e.item; if (!seen.has(k)) { seen.add(k); shown.push(e); } }
+    const isAbility = (e) => e.spellType === 4 && !(e.dur > 1) && !e.detrimental;
+    const main = shown.filter(e => !isAbility(e)), abil = shown.filter(isAbility);
+    main.sort((a, b) => (b.detrimental - a.detrimental) || ((a.dur > 1 ? a.dur - a.elapsed : 1e9) - (b.dur > 1 ? b.dur - b.elapsed : 1e9)) || a.name.localeCompare(b.name));
+    abil.sort((a, b) => a.name.localeCompare(b.name));
+    $("effCount").textContent = main.length ? String(main.length) : "";
+    let html = main.length ? main.map(effectRow).join("") : `<div class="empty">No active effects</div>`;
+    if (abil.length) html += `<div class="grp toggle" id="abilToggle" style="margin-top:10px">${abilitiesOpen ? "▾" : "▸"} Abilities · ${abil.length}</div>` + (abilitiesOpen ? abil.map(effectRow).join("") : "");
+    if (html === lastEffKey) return; lastEffKey = html;
+    const el = $("effects"), top = el.scrollTop; el.innerHTML = html; el.scrollTop = top;
+    const t = $("abilToggle"); if (t) t.onclick = () => { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); lastEffKey = ""; renderEffects(app.state && app.state.effects); };
   }
 
   // ---------- world map ----------
   const world = $("worldMap"), wctx = world.getContext("2d");
   const W2S = (x, y) => [(x - app.view.x) * app.view.scale + world.clientWidth / 2, -(y - app.view.y) * app.view.scale + world.clientHeight / 2];
   const S2W = (sx, sy) => [(sx - world.clientWidth / 2) / app.view.scale + app.view.x, -(sy - world.clientHeight / 2) / app.view.scale + app.view.y];
-  const visible = () => app.markers.filter(m => app.settings.spoilers || m.seen || m.discovered);
+  const visible = () => app.markers.filter(m => app.spoilers || m.seen || m.discovered);
   function fitWorld() {
     const w = world.clientWidth, h = world.clientHeight;
-    if (app.mapInfo) { app.view.x = app.mapInfo.cx + app.mapInfo.span * .015; app.view.y = app.mapInfo.cy - app.mapInfo.span * .015; app.view.scale = Math.min(w / (app.mapInfo.span * .9), h / (app.mapInfo.span * .62)); return; }
+    if (app.mapInfo) { app.view.x = app.mapInfo.cx; app.view.y = app.mapInfo.cy; app.view.scale = Math.min(w, h) / app.mapInfo.span; return; }
     if (!app.markers.length) return;
     let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
     for (const m of app.markers) { a = Math.min(a, m.x); c = Math.max(c, m.x); b = Math.min(b, m.y); d = Math.max(d, m.y); }
     app.view.x = (a + c) / 2; app.view.y = (b + d) / 2; app.view.scale = Math.min(w / (c - a || 1), h / (d - b || 1)) * .9;
   }
-  function drawMapImage(ctx, toScreen) {
-    if (!app.mapInfo || !app.mapImg || !app.mapImg.ok) return false;
-    const { span, cx, cy } = app.mapInfo;
-    const [x0, y0] = toScreen(cx - span / 2, cy + span / 2), [x1, y1] = toScreen(cx + span / 2, cy - span / 2);
-    ctx.drawImage(app.mapImg.el, x0, y0, x1 - x0, y1 - y0); return true;
-  }
   function drawWorld(t) {
+    fitCanvas(world);
     const w = world.clientWidth, h = world.clientHeight, ctx = wctx, s = app.state;
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
     if (app.follow && app.shown) { app.view.x = app.shown.x; app.view.y = app.shown.y; }
-    drawMapImage(ctx, W2S);
+    if (app.mapInfo && app.mapImg && app.mapImg.ok) {
+      const { span, cx, cy } = app.mapInfo, [x0, y0] = W2S(cx - span / 2, cy + span / 2), [x1, y1] = W2S(cx + span / 2, cy - span / 2);
+      ctx.drawImage(app.mapImg.el, x0, y0, x1 - x0, y1 - y0);
+    }
     const size = clamp(app.view.scale * 2600, 16, 34), showLabels = app.view.scale > .01;
     ctx.font = "13px " + FONT(); ctx.textAlign = "center";
     for (const m of visible()) {
@@ -614,22 +437,8 @@
       drawMarker(ctx, x, y, m, size);
       if (showLabels && m.name && m.discovered) { ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.8)"; ctx.fillStyle = "#f2efe8"; ctx.strokeText(m.name, x, y + size * .5 + 13); ctx.fillText(m.name, x, y + size * .5 + 13); }
     }
-    if (s && !s.where.interior) drawFollowers(ctx, W2S, s, t);
+    if (s) for (const tg of activeTargets(s)) { if (tg.interior || tg.worldspaceId !== s.where.worldspaceId) continue; const [x, y] = W2S(tg.x, tg.y); drawQuestDiamond(ctx, x, y, t); }
     if (s && app.shown && !s.where.interior) { const [x, y] = W2S(app.shown.x, app.shown.y); drawPlayer(ctx, x, y, app.shown.h, 13); }
-    // Quest marker: the tracked objective's target, like the game's quest arrow.
-    for (const q of (s && s.quests) || []) for (const tg of q.targets || []) {
-      if (tg.interior || tg.worldspaceId !== s.where.worldspaceId) continue;
-      const [x, y] = W2S(tg.x, tg.y), k = 6 + Math.sin(t / 300);
-      ctx.save(); ctx.fillStyle = "#d8b25a"; ctx.strokeStyle = "#1a140c"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x, y - k * 1.6); ctx.lineTo(x + k, y); ctx.lineTo(x, y + k * 1.6); ctx.lineTo(x - k, y); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-    }
-    const pin = app.findPin;
-    if (pin && Date.now() < pin.until && !pin.interior) {
-      const [x, y] = W2S(pin.x, pin.y), k = (t / 700) % 1, c = followerColor(pin.name);
-      ctx.save(); ctx.strokeStyle = c; ctx.globalAlpha = 1 - k; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 6 + k * 18, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 1; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.font = "13px " + FONT(); ctx.textAlign = "center"; ctx.lineWidth = 3; ctx.strokeStyle = "#000"; ctx.strokeText(pin.name, x, y - 12); ctx.fillStyle = "#fff"; ctx.fillText(pin.name, x, y - 12); ctx.restore();
-    }
   }
   let drag = null;
   function setFollow(on) { app.follow = on; $("btnFollow").classList.toggle("on", on); }
@@ -652,788 +461,116 @@
     if (!best) { tip.style.display = "none"; return; }
     tip.textContent = (best.name || "Unknown") + (best.discovered ? "" : " (undiscovered)"); tip.style.left = (mx + 14) + "px"; tip.style.top = (my + 10) + "px"; tip.style.display = "block";
   }
+  function setSpoil(on) { app.spoilers = on; store.set("spoilers", on); $("btnSpoil").classList.toggle("on", on); }
   $("btnFollow").onclick = () => setFollow(!app.follow);
   $("btnFit").onclick = () => { setFollow(false); fitWorld(); };
-  function syncSpoil() { $("btnSpoil").classList.toggle("on", app.settings.spoilers); }
-  $("btnSpoil").onclick = () => { app.settings.spoilers = !app.settings.spoilers; store.set("settings", app.settings); syncSpoil(); };
-  syncSpoil();
+  $("btnSpoil").onclick = () => setSpoil(!app.spoilers);
+  setSpoil(app.spoilers);
 
-  // ---------- mini map: compass + radar, background cut from the map around you ----------
-  const mini = $("miniMap"), mctx = mini.getContext("2d");
-  const PAPER = "#d6c7a1";
-  function drawMini(t) {
-    const w = mini.clientWidth, h = mini.clientHeight, ctx = mctx, s = app.state, ringW = 22, R = Math.min(w, h) / 2 - ringW - 2;
-    ctx.clearRect(0, 0, w, h);
-    const head = app.shown ? app.shown.h : 0, rot = -head * Math.PI / 180;
-    ctx.save(); ctx.beginPath(); ctx.arc(w / 2, h / 2, R, 0, Math.PI * 2); ctx.clip();
-    ctx.fillStyle = PAPER; ctx.fillRect(0, 0, w, h);
-    if (s && app.shown) {
-      const radius = RADAR_RANGE, scale = R / radius, cos = Math.cos(rot), sin = Math.sin(rot);
-      const toScreen = (x, y) => { const dx = (x - app.shown.x) * scale, dy = -(y - app.shown.y) * scale; return [dx * cos - dy * sin + w / 2, dx * sin + dy * cos + h / 2]; };
-      // Background: the local map floor plan around you; blank paper where there's no navmesh.
-      if (local.data && local.data.tris && local.data.tris.length) drawFloor(ctx, toScreen, { onlyNearZ: s.player.z, alpha: 1, paper: true, scale });
-      if (s.player.inCombat) { const g = ctx.createRadialGradient(w / 2, h / 2, R * .55, w / 2, h / 2, R); g.addColorStop(0, "rgba(194,58,38,0)"); g.addColorStop(1, `rgba(194,58,38,${.35 + .15 * Math.sin(t / 250)})`); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
-      if (s.player.sneaking) { const g = ctx.createRadialGradient(w / 2, h / 2, R * .3, w / 2, h / 2, R); g.addColorStop(0, "rgba(16,20,26,0)"); g.addColorStop(1, "rgba(16,20,26,.7)"); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
-      // Radar blips: gray until close enough to know, red if hostile, rings for attackers you haven't seen.
-      for (const b of s.radar || []) {
-        const [x, y] = toScreen(b.x, b.y);
-        if (b.state === "ping") {
-          const k = (t / 900) % 1; ctx.strokeStyle = `rgba(224,80,64,${1 - k})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 5 + k * 14, 0, Math.PI * 2); ctx.stroke(); continue;
-        }
-        const col = b.dead ? "#5c5a55" : b.hostile ? "#e05040" : b.hostile === false ? "#d8d2c0" : "#8f8c85";
-        ctx.fillStyle = col; ctx.strokeStyle = "#111"; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(x, y, b.state === "combat" ? 6 : 5, 0, Math.PI * 2);
-        if (b.state === "detected") { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); } else { ctx.fill(); ctx.stroke(); }
-        if (b.fight) { ctx.strokeStyle = "#e0a03a"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.stroke(); }
-        if (b.seesMe) { ctx.strokeStyle = "#f4efe2"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.ellipse(x, y - 13, 7, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = "#f4efe2"; ctx.beginPath(); ctx.arc(x, y - 13, 2, 0, Math.PI * 2); ctx.fill(); }
-      }
-      drawFollowers(ctx, toScreen, s, t);
-    }
-    ctx.restore();
-    ctx.strokeStyle = "#5a5e60"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(w / 2, h / 2, R + 1, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = "#202325"; ctx.lineWidth = ringW; ctx.beginPath(); ctx.arc(w / 2, h / 2, R + ringW / 2 + 2, 0, Math.PI * 2); ctx.stroke();
-    ctx.font = "15px " + FONT(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    for (const [l, a] of [["N", 0], ["E", 90], ["S", 180], ["W", 270]]) {
-      const ang = (a - head) * Math.PI / 180 - Math.PI / 2, rr = R + ringW / 2 + 2;
-      ctx.fillStyle = l === "N" ? "#ece8df" : "#9a968d"; ctx.fillText(l, w / 2 + Math.cos(ang) * rr, h / 2 + Math.sin(ang) * rr);
-    }
-    for (let a = 0; a < 360; a += 15) { if (a % 90 === 0) continue; const ang = (a - head) * Math.PI / 180 - Math.PI / 2; ctx.strokeStyle = "#4a4d4f"; ctx.lineWidth = 1.5; ctx.beginPath();
-      ctx.moveTo(w / 2 + Math.cos(ang) * (R + 7), h / 2 + Math.sin(ang) * (R + 7)); ctx.lineTo(w / 2 + Math.cos(ang) * (R + 12), h / 2 + Math.sin(ang) * (R + 12)); ctx.stroke(); }
-    ctx.textBaseline = "alphabetic";
-    drawPlayer(ctx, w / 2, h / 2, 0, 11);
-  }
-
-
-  // ---------- panels ----------
-  const ordinal = (n) => { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
-  const fmtTime = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}h ${m}m` : m ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`; };
-
-  function renderCharacter(s) {
-    const p = s.player, st = s.stats;
-    $("charName").textContent = p.name || "—"; $("charLevel").textContent = p.level;
-    $("gold").textContent = p.gold.toLocaleString() + " gold";
-    const ch = s.character || {};
-    const set = (id, v, sp) => { $(id).textContent = v ? Math.round(v.cur) : "–"; $(id + "m").textContent = v ? "/ " + Math.round(v.max) + (sp && sp.levels > 0 ? ` · +${sp.levels} lvls` : "") : ""; };
-    set("vH", st.health, ch.health); set("vM", st.magicka, ch.magicka); set("vS", st.stamina, ch.stamina);
-    $("vH").style.color = st.health && st.health.max > 0 && st.health.cur / st.health.max < .3 ? "#ff3b28" : "";
-    $("chipCombat").className = "chip" + (p.inCombat ? " on danger" : ""); $("chipSneak").className = "chip" + (p.sneaking ? " on" : ""); $("chipMount").className = "chip" + (p.mounted ? " on" : "");
-  }
-
-  const MONTHS = ["Morning Star", "Sun's Dawn", "First Seed", "Rain's Hand", "Second Seed", "Midyear", "Sun's Height", "Last Seed", "Hearthfire", "Frostfall", "Sun's Dusk", "Evening Star"];
-  const MLEN = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  const DAYS = ["Sundas", "Morndas", "Tirdas", "Middas", "Turdas", "Fredas", "Loredas"];
-  // Holiday dates from the Holidays mod's own "Festivals of Skyrim" book (its MCM can move them).
-  const HOLIDAYS = { "Morning Star": { 1: "New Life Festival", 15: "South Wind's Prayer", 16: "Festival of Lights" }, "Sun's Dawn": { 13: "Feast of the Dead", 16: "Heart's Day" },
-    "First Seed": { 7: "First Planting" }, "Rain's Hand": { 28: "Jester's Day" }, "Second Seed": { 7: "Second Planting" }, "Midyear": { 16: "Mid Year Celebration" },
-    "Sun's Height": { 10: "Merchant's Festival", 20: "Sun's Rest" }, "Last Seed": { 27: "Harvest's End" }, "Hearthfire": { 3: "Tales and Tallows" }, "Frostfall": { 13: "Witches Festival" },
-    "Sun's Dusk": { 20: "Warriors Festival" }, "Evening Star": { 15: "North Wind's Prayer", 25: "Saturalia", 31: "Old Life Festival" } };
-  const SEASONS = ["", "Winter", "Spring", "Summer", "Autumn"];
-  const PHASES = ["Full", "Waning gibbous", "Last quarter", "Waning crescent", "New", "Waxing crescent", "First quarter", "Waxing gibbous"];
-  let calKey = "";
-  function renderHeaderAndCalendar(s) {
-    const wh = s.where;
-    $("whereBig").textContent = wh.interior ? (wh.cell || "Interior") : (wh.location || wh.worldspace || "Wilderness");
-    $("whereSmall").textContent = wh.interior ? (wh.location || "") : (wh.worldspace || "");
-    if (!s.time) return;
-    const tm = s.time;
-    $("when").textContent = `${tm.dayName}, ${ordinal(tm.day)} of ${tm.month}, 4E ${tm.year} · ${gameTime(s)}`;
-    const wo = s.world || {};
-    const key = tm.month + tm.day + tm.year + "|" + wo.season; if (key === calKey) return; calKey = key;
-    const mi = MONTHS.indexOf(tm.month), len = mi >= 0 ? MLEN[mi] : 30, wd = DAYS.indexOf(tm.dayName);
-    $("calMonth").textContent = tm.month; $("calYear").textContent = "4E " + tm.year;
-    if (wd < 0) { $("cal").innerHTML = ""; return; }
-    const first = ((wd - (tm.day - 1)) % 7 + 7) % 7;
-    let html = "<table><tr>" + ["Su", "Mo", "Ti", "Mi", "Tu", "Fr", "Lo"].map(d => `<th>${d}</th>`).join("") + "</tr><tr>";
-    for (let i = 0; i < first; i++) html += "<td></td>";
-    const hol = HOLIDAYS[tm.month] || {};
-    for (let d = 1; d <= len; d++) { const col = (first + d - 1) % 7; html += `<td class="${d === tm.day ? "today" : ""} ${hol[d] ? "hol" : ""}" title="${esc(hol[d] || "")}">${d}</td>`; if (col === 6 && d < len) html += "</tr><tr>"; }
-    const foot = [];
-    const upcoming = Object.entries(hol).filter(([d]) => +d >= tm.day).map(([d, n]) => `<span><span class="goldc">${d}</span> ${esc(n)}${+d === tm.day ? " (today)" : ""}</span>`);
-    foot.push(...upcoming);
-    if (wo.season > 0) foot.push(`<span>${SEASONS[wo.season]}</span>`);
-    if (wo.moonPhaseLength > 0 && wo.daysPassed >= 0) foot.push(`<span>Moons: ${PHASES[Math.floor(wo.daysPassed / wo.moonPhaseLength) % 8]}</span>`);
-    $("cal").innerHTML = html + `</tr></table><div class="calfoot">${foot.join("")}</div>`;
-  }
-
-  function renderParty(list) {
-    list = list || [];
-    const alive = list.filter(f => !f.dead);
-    $("partyCount").textContent = alive.length || "";
-    if (!list.length) { $("party").innerHTML = `<div class="empty">No one with you</div>`; return; }
-    const pct = (v) => v && v.max > 0 ? clamp(v.cur / v.max, 0, 1) * 100 : 0;
-    const order = { "Downed": 0, "In combat": 1, "Following": 2, "Waiting": 3, "Away": 4, "Dead": 5 };
-    const sorted = list.slice().sort((a, b) => (order[a.status] ?? 6) - (order[b.status] ?? 6) || a.name.localeCompare(b.name));
-    const card = (f) => {
-      const cls = f.status === "Downed" || f.status === "Dead" ? "bad" : f.status === "In combat" ? "warn" : "";
-      const dist = f.distance >= 0 ? Math.round(f.distance / 70) + " m away" : "";
-      const where = f.sameSpace ? dist : (f.interior ? (f.cell || "Interior") : (f.location || f.cell || "Elsewhere"));
-      const low = pct(f.health) < 30 && !f.dead, b = f.battle;
-      const battle = b ? [b.right, b.left].filter(Boolean).map(esc).join(" / ") + ` · Armor ${Math.round(b.armor)}` + (b.ammo ? ` · ${esc(b.ammo.name)} ${b.ammo.count}` : "") +
-        (b.spells && b.spells.length ? ` · ${b.spells.map(esc).join(", ")}` : "") + (b.carry ? ` · Carry ${Math.round(b.carry.cur)}/${Math.round(b.carry.max)}` : "") : "";
-      return `<div class="pcard ${f.dead ? "dead" : ""}" data-id="${f.id}">
-        <div class="top"><span class="pdot" style="background:${followerColor(f.name)}"></span><span class="pname">${esc(f.name)}</span><span class="mute num" style="font-size:12px">${f.level}</span>
-        ${f.essential ? '<span class="ess">ESSENTIAL</span>' : ""}<span class="pst ${cls}">${esc(f.status)}${f.mounted ? " · mounted" : ""}</span></div>
-        <div class="mbars"><div class="bar"><i style="width:${pct(f.health)}%;background:${low ? "#ff3b28" : "var(--health)"}"></i></div>
-        <div class="bar"><i style="width:${pct(f.magicka)}%;background:var(--magicka)"></i></div><div class="bar"><i style="width:${pct(f.stamina)}%;background:var(--stamina)"></i></div></div>
-        ${battle ? `<div class="pline">${battle}</div>` : ""}
-        <div class="pline">${esc(where)}${f.sameSpace ? "" : `<button class="pbtn" data-find="${f.id}">Find</button>`}</div></div>`;
-    };
-    const people = sorted.filter(f => !f.creature), beasts = sorted.filter(f => f.creature);
-    let html = people.map(card).join("");
-    if (beasts.length) html += `<div class="grp">Beasts and pets</div>` + beasts.map(card).join("");
-    const sl = app.state && app.state.partySlots;
-    if (sl && sl.tamed1 >= 0) {
-      const cap = 1 + Math.max(0, sl.packLeader || 0), used = (sl.tamed1 > 0 ? 1 : 0) + (sl.tamed2 > 0 ? 1 : 0);
-      const hunger = (h) => h >= 0 ? `${Math.round(h)}/6 hungry · leaves in about ${Math.max(0, 6 - Math.round(h)) * 15} game hours unless fed` : "";
-      if (used) html += `<div class="grp">Tamed · ${used} / ${cap}</div>` + [sl.tamed1 > 0 ? hunger(sl.pet1Hunger) : "", sl.tamed2 > 0 ? hunger(sl.pet2Hunger) : ""].filter(Boolean).map(x => `<div class="pline ${/[56]\/6/.test(x) ? "red" : ""}">${x}</div>`).join("");
-    }
-    $("party").innerHTML = html;
-    fitList($("party"), "in party");
-  }
-  $("party").addEventListener("click", (e) => {
-    const find = e.target.closest("[data-find]");
-    if (find) { e.stopPropagation(); findActor(+find.dataset.find); return; }
-    const c = e.target.closest(".pcard"); if (c) openFollower(+c.dataset.id);
-  });
-  async function findActor(id) {
-    try {
-      const r = await fetchJson("/api/find/" + id.toString(16));
-      if (r.error) return;
-      app.findPin = { ...r, until: Date.now() + 120000 };
-      addEvent(app.state, `${r.name}: ${r.where || "unknown"}${r.interior ? " (inside)" : ""}`);
-      if (!r.interior) { setView("world"); setFollow(false); app.view.x = r.x; app.view.y = r.y; }
-    } catch {}
-  }
-  async function openFollower(id) {
-    openSheet("Follower", `<div class="empty">Loading…</div>`);
-    try {
-      const r = await fetchJson("/api/follower/" + id.toString(16));
-      const items = (r.items || []).slice().sort((a, b) => (b.worn - a.worn) || a.name.localeCompare(b.name));
-      $("sheetTitle").textContent = r.name || "Follower";
-      $("sheetBody").innerHTML = `<div class="dim" style="margin-bottom:6px">${esc(r.where || "")}</div>
-        <div class="grp">In hand</div><div>${[r.right, r.left].filter(Boolean).map(esc).join(" / ") || "Nothing"}</div>
-        <div class="grp">Equipped</div>${items.filter(i => i.worn).map(i => `<div class="row2"><span>${esc(i.name)}</span></div>`).join("") || '<div class="empty">Nothing</div>'}
-        <div class="grp">Spells</div><div class="dim">${(r.spells || []).map(esc).join(", ") || "None"}</div>
-        <div class="grp">Inventory · ${items.length} items</div>` +
-        items.filter(i => !i.worn).map(i => `<div class="row2"><span>${esc(i.name)}</span><span class="mute num">${i.count > 1 ? "×" + i.count : ""}</span><span class="mute num" style="margin-left:auto">${(+i.weight).toFixed(1)} wt</span></div>`).join("");
-    } catch { $("sheetBody").innerHTML = `<div class="empty">Couldn't read that follower right now.</div>`; }
-  }
-
-
-  const HUNGER = ["Well Fed", "Satisfied", "Peckish", "Hungry", "Famished", "Starving"];
-  const COLD = ["Warm", "Comfortable", "Chilly", "Very Cold", "Freezing", "Numb"];
-  const FATIGUE = ["Well Rested", "Rested", "Slightly Tired", "Tired", "Weary", "Debilitated"];
-  function stageFrom(n) { if (n.stage >= 0) return Math.round(n.stage); let st = 0; (n.thresholds || []).forEach((t, i) => { if (t > 0 && n.value >= t) st = i + 1; }); return st; }
-  function renderSurvival(sv) {
-    const el = $("survival");
-    if (!sv || sv.enabled === 0 || !(sv.hunger || sv.cold || sv.fatigue)) { el.innerHTML = `<div class="empty">${sv && sv.enabled === 0 ? "Survival Mode is off" : "Survival Mode not detected"}</div>`; $("ambient").textContent = ""; return; }
-    const rows = [["hunger", HUNGER, "var(--hunger)"], ["cold", COLD, "var(--frost)"], ["fatigue", FATIGUE, "var(--fatigue)"]];
-    el.innerHTML = rows.filter(([k]) => sv[k]).map(([k, names, color]) => {
-      const n = sv[k], max = n.max > 0 ? n.max : 1000, pct = clamp(n.value / max, 0, 1) * 100, st = stageFrom(n);
-      const ticks = (n.thresholds || []).filter(t => t > 0 && t < max).map(t => `<span class="tk" style="left:${t / max * 100}%"></span>`).join("");
-      return `<span>${esc(n.name)}</span><div class="bar" style="height:7px"><i style="width:${pct}%;background:${color}"></i>${ticks}</div>
-        <div class="st" style="${st >= 3 ? "color:var(--bad)" : ""}">${esc(names[st] || "")} <span class="mute num">${Math.round(n.value)} / ${Math.round(max)}</span> <span class="mute">${nextStageIn(k, n)}</span></div>`;
-    }).join("");
-    $("ambient").textContent = sv.ambientCold >= 0 ? "Area cold " + Math.round(sv.ambientCold) : "";
-  }
-
-  const SLOT_ORDER = ["head", "body", "hands", "forearms", "feet", "calves", "shield", "amulet", "ring"];
-  const SLOT_NAME = { head: "Head", body: "Body", hands: "Hands", forearms: "Arms", feet: "Feet", calves: "Legs", shield: "Shield", amulet: "Neck", ring: "Ring" };
-  function renderEquipment(eq) {
-    if (!eq) return;
-    $("armorRating").textContent = "Armor " + Math.round(eq.armorRating ?? 0);
-    const r = eq.resists || {};
-    $("resists").textContent = "Resist  " + [["Fire", r.fire], ["Frost", r.frost], ["Shock", r.shock], ["Magic", r.magic], ["Poison", r.poison]].map(([n, v]) => `${n} ${Math.round(v || 0)}%`).join(" · ");
-    if (eq.carry) {
-      const over = eq.carry.cur > eq.carry.max, txt = `${Math.round(eq.carry.cur)} / ${Math.round(eq.carry.max)}`;
-      $("carryText").textContent = txt; $("carryTop").textContent = "Carry " + txt;
-      $("carryFill").style.width = clamp(eq.carry.cur / (eq.carry.max || 1), 0, 1) * 100 + "%";
-      $("carryFill").style.background = over ? "var(--bad)" : eq.carry.cur / eq.carry.max > .9 ? "var(--gold)" : "var(--fg-dim)";
-      $("carryText").className = "r num " + (over ? "red" : "dim");
-    }
-    const row = (slot, name, right) => `<div class="row"><span class="slot">${esc(slot)}</span><span class="nm">${name}</span><span class="r num">${right ?? ""}</span></div>`;
-    const hand = (h, label) => {
-      if (!h) return "";
-      let right = "", extra = "";
-      if (h.kind === "weapon") { right = h.damage ? Math.round(h.damage) + " dmg" : ""; if (typeof h.charge === "number") extra = ` <span class="mute">${Math.round(h.charge)}%</span>`; if (h.poison) extra += ` <span class="goodc">· ${esc(h.poison.name)} ×${h.poison.doses}</span>`; }
-      else if (h.kind === "spell") right = `<span class="mute">spell</span>`;
-      else if (h.kind === "shield") right = Math.round(h.armor);
-      const ench = h.enchant ? ` <span class="mute">· ${esc(h.enchant)}</span>` : "";
-      return row(label, esc(h.name) + ench + extra, right);
-    };
-    let html = hand(eq.right, "Right") + hand(eq.left, "Left");
-    if (eq.ammo) html += row("Ammo", esc(eq.ammo.name), `<span class="${eq.ammo.count < 10 ? "red" : ""}">${eq.ammo.count}</span>`);
-    if (eq.power) html += row(eq.power.shout ? "Shout" : "Power", esc(eq.power.name), eq.power.shout ? `<span class="dim" id="shoutCd"></span>` : "");
-    $("hands").innerHTML = html || `<div class="empty">Nothing in hand</div>`;
-    const worn = (eq.worn || []).slice().sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot));
-    $("worn").innerHTML = worn.map(a => row(SLOT_NAME[a.slot] || a.slot, esc(a.name) + (a.enchant ? ` <span class="mute">· ${esc(a.enchant)}</span>` : ""), a.armor ? Math.round(a.armor) : "")).join("") || `<div class="empty">No armor</div>`;
-  }
-
-  const SPELLTYPE = { 0: "Spell", 1: "Disease", 2: "Power", 3: "Lesser power", 4: "Ability", 5: "Poison", 6: "Enchantment", 7: "Potion", 8: "Ingredient", 10: "Addiction", 11: "Shout", 12: "Staff", 13: "Scroll" };
-  function effectSource(e) {
-    const kind = SPELLTYPE[e.spellType] || "", parts = [];
-    if (e.spellType === 6 && e.item) parts.push(e.item); else if (e.spell && e.spell !== e.name) parts.push(e.spell); else if (e.item) parts.push(e.item);
-    let txt = kind ? kind + (parts.length ? ": " + parts.join(", ") : "") : parts.join(", ");
-    if (e.caster && e.caster !== "You") txt += (txt ? " · " : "") + "from " + e.caster;
-    return txt;
-  }
-  function effectRow(e, i) {
-    const ic = effectIcon(e), timed = e.dur > 1, left = e.dur - e.elapsed, sel = i === selEffect;
-    const more = sel ? `<span class="effx">${timed ? `Running ${fmtTime(e.elapsed)} of ${fmtTime(e.dur)} · ${fmtTime(left)} left` : "No time limit"}${e.mag ? ` · magnitude ${Math.round(e.mag)}` : ""}${e.caster && e.caster !== "You" ? ` · from ${esc(e.caster)}` : ""}</span>` : "";
-    return `<div class="eff ${e.detrimental ? "bad" : ""} ${sel ? "sel" : ""}">${iconHtml("effects/" + ic.base + ".png", ic.emblem ? "effects/emblem_" + ic.emblem + ".png" : null)}
-      <span class="nm">${esc(e.name)}${e.mag ? ` <span class="dim num">${Math.round(e.mag)}</span>` : ""}</span><span class="num dim">${timed ? fmtTime(left) : ""}</span>
-      <span class="src">${esc(effectSource(e))}</span>${more}</div>`;
-  }
-  function renderEffects(list) {
-    const el = $("effects");
-    const all = (list || []).filter(e => e.name && !e.hidden && !e.inactive);
-    const seen = new Set(), shown = [];
-    for (const e of all) { const k = e.name + "|" + e.spell + "|" + e.item; if (!seen.has(k)) { seen.add(k); shown.push(e); } }
-    const isAbility = (e) => e.spellType === 4 && !(e.dur > 1) && !e.detrimental;
-    const main = shown.filter(e => !isAbility(e)), abil = shown.filter(isAbility);
-    main.sort((a, b) => (b.detrimental - a.detrimental) || ((a.dur > 1 ? a.dur - a.elapsed : 1e9) - (b.dur > 1 ? b.dur - b.elapsed : 1e9)) || a.name.localeCompare(b.name));
-    abil.sort((a, b) => a.name.localeCompare(b.name));
-    if (selEffect >= main.length) selEffect = main.length ? -1 : -1;
-    let html = main.length ? main.map((e, i) => effectRow(e, i)).join("") : `<div class="empty">No active effects</div>`;
-    if (abil.length) { html += `<div class="grp" id="abilToggle" style="cursor:pointer;margin-top:6px">${abilitiesOpen ? "▾" : "▸"} Abilities · ${abil.length}</div>`; if (abilitiesOpen) html += abil.map(e => effectRow(e, -2)).join(""); }
-    el.innerHTML = html; fitList(el, "effects");
-    const t = $("abilToggle"); if (t) t.onclick = () => { abilitiesOpen = !abilitiesOpen; store.set("abilitiesOpen", abilitiesOpen); renderEffects(list); };
-  }
-
-  // ---------- supplies ----------
-  function mainEffect(p) { let best = null; for (const e of p.effects || []) if (!best || e.mag * Math.max(1, e.dur) > best.mag * Math.max(1, best.dur)) best = e; return best; }
-  // Instant restore potions (what Smart Optimal Salves picks from). Exclusions from its INI come later.
-  function restoreKind(p) {
-    if (p.kind !== "potion") return null;
-    const e = mainEffect(p); if (!e || e.detrimental || e.recover || e.dur > 1) return null;
-    return e.av === 24 ? "h" : e.av === 25 ? "m" : e.av === 26 ? "s" : null;
-  }
-  const isCure = (p) => (p.effects || []).some(e => e.archetype === 3 || /cure disease/i.test(e.name));
-  const isSkooma = (p) => /skooma/i.test(p.name);
-  function renderConsumables(list, sup, warmth) {
-    const el = $("consumables"); list = list || [];
-    const tot = { h: [0, 0], m: [0, 0], s: [0, 0] };
-    let cure = 0, skooma = 0, food = 0, poison = 0, other = 0;
-    for (const p of list) {
-      const k = restoreKind(p);
-      if (k) { tot[k][0] += p.count; tot[k][1] += p.count * (mainEffect(p)?.mag || 0); continue; }
-      if (isSkooma(p)) { skooma += p.count; continue; }
-      if (isCure(p)) { cure += p.count; continue; }
-      if (p.kind === "food") food += p.count; else if (p.kind === "poison") poison += p.count; else other += p.count;
-    }
-    const r = (key, name, c, total, cls) => `<div class="cons"><span>${key ? `<span class="key">${key}</span>` : ""}</span><span>${name}</span><span class="cnt num ${cls || ""}">${c}</span><span class="num dim" style="font-size:12px">${total || ""}</span></div>`;
-    el.innerHTML =
-      r("V", "Health", tot.h[0], tot.h[1] ? "+" + Math.round(tot.h[1]) : "", tot.h[0] <= 2 ? "red" : "") +
-      r("B", "Magicka", tot.m[0], tot.m[1] ? "+" + Math.round(tot.m[1]) : "", tot.m[0] <= 2 ? "red" : "") +
-      r("N", "Stamina", tot.s[0], tot.s[1] ? "+" + Math.round(tot.s[1]) : "", tot.s[0] <= 2 ? "red" : "") +
-      `<div class="rule"></div>` + r("", "Cure Disease", cure) + r("", "Skooma", skooma, "", skooma > 0 ? "red" : "") +
-      `<div class="rule"></div>` + foodRows(food, sup, warmth) + stressRows(list) + r("", "Poisons", poison) + r("", "Other potions", other) + extrasRows(sup);
-    fitList(el, "rows");
-  }
-
-  // ---------- game event feed (pickups, skill ups, level ups, discoveries) ----------
-  let lastEventId = null;
-  function runEvents(s) {
-    const list = s.events || [];
-    if (!list.length) return;
-    const maxId = Math.max(...list.map(e => e.id));
-    if (lastEventId === null) { lastEventId = maxId; return; }
-    for (const e of list.filter(e => e.id > lastEventId).sort((a, b) => a.id - b.id)) addEvent(s, e.text, false);
-    lastEventId = Math.max(lastEventId, maxId);
-  }
-  const cleanText = (x) => String(x || "").replace(/<[^>]*>/g, "").trim();
-
-  // ---------- level ring + skills tracker ----------
-  const skillXp = new Map(), skillGlow = new Map();
-  let chosenSkills = store.get("skills", null);
-  function renderProgress(pr) {
-    if (!pr) return;
-    const frac = pr.threshold > 0 ? clamp(pr.xp / pr.threshold, 0, 1) : 0;
-    $("lvArc").setAttribute("stroke-dashoffset", (94.25 * (1 - frac)).toFixed(2));
-    const now = Date.now();
-    for (const sk of pr.skills || []) {
-      const last = skillXp.get(sk.name);
-      if (last !== undefined && (sk.xp > last + 1e-4 || sk.level > (skillLevel.get(sk.name) || 0))) skillGlow.set(sk.name, now + 3000);
-      skillXp.set(sk.name, sk.xp); skillLevel.set(sk.name, sk.level);
-    }
-    const pick = chosenSkills && chosenSkills.length ? chosenSkills : (pr.skills || []).slice().sort((a, b) => b.level - a.level).slice(0, 4).map(x => x.name);
-    $("skills").innerHTML = (pr.skills || []).filter(x => pick.includes(x.name)).map(x => {
-      const glow = (skillGlow.get(x.name) || 0) > now, f = x.threshold > 0 ? clamp(x.xp / x.threshold, 0, 1) : 0;
-      return `<div class="skill ${glow ? "gain" : ""}"><span>${esc(x.name)}</span><span class="num dim">${Math.round(x.level)}</span><div class="bar"><i style="width:${f * 100}%;background:${glow ? "var(--gold)" : "var(--fg-dim)"}"></i></div></div>`;
-    }).join("");
-  }
-  const skillLevel = new Map();
-
-  // ---------- survival countdowns (rate measured from the last minute of readings) ----------
-  const needSamples = { hunger: [], cold: [], fatigue: [] };
-  function nextStageIn(key, n) {
-    const arr = needSamples[key], now = performance.now();
-    arr.push([now, n.value]); while (arr.length && now - arr[0][0] > 60000) arr.shift();
-    if (arr.length < 2) return "";
-    const [t0, v0] = arr[0], dt = (now - t0) / 1000, rate = (n.value - v0) / dt;
-    if (dt < 8) return "";
-    if (rate <= 1e-4) return rate < -1e-4 ? "easing" : "";
-    const next = (n.thresholds || []).filter(t => t > n.value).sort((a, b) => a - b)[0];
-    if (next === undefined) return "";
-    const sec = (next - n.value) / rate, m = Math.round(sec / 60);
-    return sec < 90 ? "next stage in <1 min" : m < 60 ? `next stage in ${m} min` : `next stage in ${Math.floor(m / 60)} h ${m % 60} min`;
-  }
-  function protColor(p) {
-    if (p >= .8 - 1e-6) return "var(--gold)";
-    const k = clamp(p / .8, 0, 1), a = [121, 184, 230], b = [239, 122, 53];
-    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * k)).join(",")})`;
-  }
-  function renderWarmth(w, sv) {
-    const el = $("prot");
-    if (!w || !w.cap || !sv || sv.enabled === 0) { el.style.display = "none"; return; }
-    el.style.display = "";
-    const p = .8 * clamp(w.rating, 0, w.cap) / w.cap;
-    $("protPct").textContent = Math.round(p * 100) + "%"; $("protPct").style.color = protColor(p);
-    // Campfire: full steady flame when warming, small flickering flame when you're in range but moving,
-    // small steady flame when you're in range and still but not warming (capped), unlit when no heat source.
-    const warming = w.uiLevel === 1, near = !!w.nearHeat || warming;
-    const state = warming ? "warming" : near && w.moving ? "moving" : near ? "capped" : "none";
-    const label = { warming: "Near fire, warming", moving: "Near fire, not warming while moving", capped: "Near fire, as warm as it gets here", none: "No heat source" }[state];
-    $("protInfo").innerHTML = `Warmth ${Math.round(w.rating)} / ${Math.round(w.cap)}<br>${label}`;
-    const t = performance.now(), wd = state === "warming" ? 13 : 8;
-    const h = state === "warming" ? 26 + Math.sin(t / 180) * 1.5 : state === "moving" ? 15 + Math.sin(t / 70) * 4 + Math.sin(t / 37) * 2 : state === "capped" ? 15 : 0;
-    $("flame").innerHTML = `<path d="M3 34 L27 30 M5 30 L25 34" stroke="#6b4a2a" stroke-width="2.5" stroke-linecap="round"/>` + (h > 0 ?
-      `<path d="M15 ${32 - h} C ${15 + wd} ${32 - h * .55}, ${15 + wd * .8} 31, 15 31 C ${15 - wd * .8} 31, ${15 - wd} ${32 - h * .55}, 15 ${32 - h} Z" fill="#ef7a35"/>
-       <path d="M15 ${32 - h * .55} C ${15 + wd * .45} ${32 - h * .3}, ${15 + wd * .4} 31, 15 31 C ${15 - wd * .4} 31, ${15 - wd * .45} ${32 - h * .3}, 15 ${32 - h * .55} Z" fill="#ffd27a"/>` : "");
-  }
-
-  // ---------- quest header ----------
-  function renderQuest(qs) {
-    const el = $("quest");
-    if (!qs || !qs.length) { el.innerHTML = ""; return; }
-    const newest = qs[qs.length - 1], same = qs.filter(q => q.quest === newest.quest);
-    const older = same.slice(0, -1).slice(-2).reverse();
-    const inside = (newest.targets || []).find(tg => tg.interior && tg.cell);
-    el.innerHTML = `<b>${esc(newest.quest)}</b><span class="obj">${esc(cleanText(newest.text))}</span>` + (inside ? `<span class="mute">in ${esc(inside.cell)}</span>` : "") + older.map(q => `<span class="old">${esc(cleanText(q.text))}</span>`).join("");
-  }
-
-  // ---------- crosshair details ----------
-  const WTYPE = { 0: "Fists", 1: "Sword", 2: "Dagger", 3: "War axe", 4: "Mace", 5: "Greatsword", 6: "Battleaxe", 7: "Bow", 8: "Staff", 9: "Crossbow" };
-  const SOULS = ["Empty", "Petty", "Lesser", "Common", "Greater", "Grand"];
-  const mineTimes = []; let lastSwings = null, lastSwingT = 0;
-  function renderDet(c) {
-    const el = $("det");
-    if (!c) { el.innerHTML = `<div class="empty">Look at something</div>`; lastSwings = null; return; }
-    const rows = [];
-    const add = (k, v) => { if (v !== undefined && v !== null && v !== "") rows.push(`<span>${k}</span><span>${v}</span>`); };
-    let kind = c.kind;
-    if (c.kind === "weapon") {
-      kind = WTYPE[c.weaponType] || "Weapon";
-      let cmp = "";
-      if (c.compare) { const d = c.damage - c.compare.damage; cmp = d > 0 ? ` <span class="goodc">▲ ${Math.round(d)} over ${esc(c.compare.name)}</span>` : d < 0 ? ` <span class="red">▼ ${Math.round(-d)} under ${esc(c.compare.name)}</span>` : ` <span class="mute">same as ${esc(c.compare.name)}</span>`; }
-      add("Damage", `<span class="num">${Math.round(c.damage)}</span> <span class="mute">base</span>${cmp}`);
-    } else if (c.kind === "armor") {
-      kind = (c.class === "clothing" ? "Clothing" : c.class === "heavy" ? "Heavy armor" : "Light armor") + (c.slot ? " · " + c.slot : "");
-      let cmp = "";
-      if (c.compare) { const d = c.armor - c.compare.armor, sameClass = c.compare.class === c.class; cmp = !sameClass ? ` <span class="mute">vs ${esc(c.compare.name)} (different class)</span>` : d > 0 ? ` <span class="goodc">▲ ${Math.round(d)} over ${esc(c.compare.name)}</span>` : d < 0 ? ` <span class="red">▼ ${Math.round(-d)} under ${esc(c.compare.name)}</span>` : ` <span class="mute">same as ${esc(c.compare.name)}</span>`; }
-      add("Armor", `<span class="num">${Math.round(c.armor)}</span> <span class="mute">base</span>${cmp}`);
-    } else if (c.kind === "book") {
-      kind = c.note ? "Note" : c.skill ? "Skill book · " + c.skill : "Book";
-      add("Read", c.read ? "Yes" : `<span class="goldc">No</span>`);
-    } else if (c.kind === "container") {
-      kind = "Container"; add("Lock", c.lock || "Unlocked"); add("Owner", c.owner ? esc(c.owner) : "None");
-    } else if (c.kind === "door") {
-      kind = "Door"; add("Leads to", c.leadsTo ? esc(c.leadsTo) : ""); add("Lock", c.lock || "Unlocked");
-    } else if (c.kind === "plant") {
-      kind = "Plant"; add("Gives", esc(c.gives)); add("Harvested", c.harvested ? "Yes" : "No");
-    } else if (c.kind === "ore") {
-      kind = "Ore vein"; const o = c.ore || {};
-      if (o.oreLeft === 0) add("Status", `<span class="red">Depleted</span>`);
-      else if (o.oreLeft < 0) {
-        const r = o.range;
-        add("Status", "Not started");
-        if (r) { add("Ore", `<span class="num">${Math.round(r.oreMin)}${r.oreMax !== r.oreMin ? " to " + Math.round(r.oreMax) : ""}</span> <span class="mute">${esc(r.mode)}${r.skill ? " · Smithing " + Math.round(r.skill) : ""}</span>`);
-                 add("Swings each", `<span class="num">${Math.round(r.swingsMin)}${r.swingsMax !== r.swingsMin ? " to " + Math.round(r.swingsMax) : ""}</span>`); }
-      }
-      else {
-        add("Ore left", `<span class="num">${o.oreLeft * Math.max(1, o.orePerStrike)}</span>`);
-        const sw = o.swingsLeft > 0 ? o.swingsLeft : o.swingsEach;
-        add("Swings to next", `<span class="num">${sw}</span>`);
-        const now = performance.now();
-        if (lastSwings !== null && o.swingsLeft !== lastSwings) { if (lastSwingT) { mineTimes.push((now - lastSwingT) / 1000); if (mineTimes.length > 8) mineTimes.shift(); } lastSwingT = now; }
-        lastSwings = o.swingsLeft;
-        if (mineTimes.length) { const per = mineTimes.reduce((a, b) => a + b, 0) / mineTimes.length, total = (o.oreLeft - 1) * o.swingsEach + sw; add("Time to mine", `<span class="num">about ${Math.round(per * total)} s</span>`); }
-      }
-    } else if (c.kind === "actor") {
-      kind = c.dead ? "Dead" : c.hostile ? "Hostile" : "Creature or person";
-      add("Level", c.level); if (c.health && !c.dead) add("Health", `<span class="num">${Math.round(c.health.cur)} / ${Math.round(c.health.max)}</span>`);
-    } else kind = "Item";
-    if (c.weight !== undefined && c.kind !== "actor") {
-      add("Weight", `<span class="num">${+(+c.weight).toFixed(1)}</span>`);
-      add("Value", `<span class="num">${c.value}${c.weight > 0 ? ` <span class="mute">· ${(c.value / c.weight).toFixed(1)} per weight</span>` : ""}</span>`);
-    }
-    if (c.owner && c.kind !== "container") add("Owner", `<span class="${c.stealing ? "red" : ""}">${esc(c.owner)}${c.stealing ? " (stealing)" : ""}</span>`);
-    else if (c.stealing) add("Taking it", `<span class="red">counts as stealing</span>`);
-    el.innerHTML = `<div class="kind">${esc(kind)}</div><div class="nm">${esc(c.name || "")}</div><div class="g2">${rows.join("")}</div>`;
-  }
-
-  function stressRows(list) {
-    const st = app.state && app.state.stress;
-    const relief = list.filter(p => p.stress > 0), n = relief.reduce((a, p) => a + p.count, 0), total = relief.reduce((a, p) => a + p.count * p.stress, 0);
-    if (!st && !n) return "";
-    let html = "";
-    if (st && st.enabled) {
-      const pct = clamp(st.value / (st.max || 100), 0, 1);
-      html += `<div class="cons"><span></span><span>Stress</span><span class="cnt num ${pct >= .75 ? "red" : ""}">${Math.round(st.value)}</span><span class="num dim" style="font-size:12px">/ ${st.max || 100}</span></div>
-        <div class="bar" style="margin:1px 0 3px 30px"><i style="width:${pct * 100}%;background:${pct >= .75 ? "var(--bad)" : "#b48ad8"}"></i></div>`;
-    }
-    if (n) html += `<div class="cons"><span></span><span>Stress relief</span><span class="cnt num">${n}</span><span class="num dim" style="font-size:12px">−${total}</span></div>`;
-    return html;
-  }
-  function foodRows(foodCount, sup, warmth) {
-    const tiers = [0, 0, 0, 0], restore = (warmth && warmth.restore) || [0, 0, 0, 0];
-    let hunger = 0;
-    for (const f of (sup && sup.food) || []) { if (/^raw\b/i.test(f.name)) continue; tiers[f.tier - 1] += f.count; hunger += f.count * (restore[f.tier - 1] || 0); }
-    const total = tiers.reduce((a, b) => a + b, 0);
-    if (!total) return `<div class="cons"><span></span><span>Food</span><span class="cnt num">${foodCount}</span><span></span></div>`;
-    return `<div class="cons"><span></span><span>Food</span><span class="cnt num">${total}</span><span class="num dim" style="font-size:12px">${Math.round(hunger)} hunger</span></div>
-      <div class="mute" style="font-size:11px;padding-left:30px">Large ${tiers[3]} · Medium ${tiers[2]} · Small ${tiers[1]} · Very small ${tiers[0]}</div>`;
-  }
-  function extrasRows(sup) {
-    if (!sup) return "";
-    let html = `<div class="rule"></div><div class="cons"><span></span><span>Lockpicks</span><span class="cnt num">${sup.lockpicks ?? 0}</span><span></span></div>`;
-    const empty = {}, filled = {};
-    for (const g of sup.soulGems || []) {
-      const size = g.black ? "Black" : SOULS[g.capacity] || "?";
-      if (g.soul > 0) filled[SOULS[g.soul] || "?"] = (filled[SOULS[g.soul] || "?"] || 0) + g.count; else empty[size] = (empty[size] || 0) + g.count;
-    }
-    const fmt = (o) => Object.entries(o).map(([k, v]) => `${k} ${v}`).join(" · ");
-    if (Object.keys(empty).length) html += `<div class="dim" style="font-size:12px">Empty gems: ${esc(fmt(empty))}</div>`;
-    if (Object.keys(filled).length) html += `<div class="dim" style="font-size:12px">Filled: ${esc(fmt(filled))}</div>`;
-    const b = sup.bounties || [];
-    html += `<div class="dim" style="font-size:12px">${b.length ? "Bounty: " + b.map(x => `<span class="red">${esc(x.faction.replace(/^Crime Faction /i, ""))} ${x.bounty}</span>`).join(" · ") : "No bounties"}</div>`;
-    return html;
-  }
-
-  let lastSlow = 0;
-  function renderPanels(s) {
-    renderCharacter(s); renderHeaderAndCalendar(s); renderParty(s.followers); renderEffects(s.effects); renderSurvival(s.survival);
-    runEvents(s); renderProgress(s.progress); renderWarmth(s.warmth, s.survival); renderDet(s.crosshair); renderOpponent(s); autoView(s);
-    if (app.view_ === "world") $("mapNote").textContent = s.mapOpened === false && !app.demo ? "Open the map in game once to load markers" : "";
-    if (Date.now() - lastSlow > 900) { lastSlow = Date.now(); renderEquipment(s.equipment); renderConsumables(s.consumables, s.supplies, s.warmth); renderQuest(s.quests); }
-    const cd = $("shoutCd"); if (cd) cd.textContent = s.shoutCooldown > .5 ? Math.ceil(s.shoutCooldown) + " s" : "";
-  }
-  window.addEventListener("resize", () => { lastSlow = 0; if (app.state) renderPanels(app.state); renderEvents(); });
-
-  // ---------- local map (navmesh floor plan, explored parts only) ----------
-  const RADAR_RANGE = 6000;
-  const local = { data: null, version: 0, busy: false, bits: null };
+  // ---------- local map (navmesh floor plan; explored parts, this play session) ----------
+  const local = { data: null, version: 0, busy: false, bits: null, zoom: store.get("localZoom", 1) };
   async function pollLocal() {
     if (app.demo || local.busy || !app.state) return;
     local.busy = true;
-    try {
-      const r = await fetchJson("/api/localmap/" + local.version);
-      if (!r.same && r.version) { local.data = r; local.version = r.version; local.bits = decodeBits(r.explored || ""); }
-    } catch {} finally { local.busy = false; }
+    try { const r = await fetchJson("/api/localmap/" + local.version); if (!r.same && r.version) { local.data = r; local.version = r.version; local.bits = decodeBits(r.explored || ""); } }
+    catch {} finally { local.busy = false; }
   }
   function decodeBits(hex) { const out = new Uint8Array(hex.length * 4); for (let i = 0; i < hex.length; i++) { const v = parseInt(hex[i], 16); for (let b = 0; b < 4; b++) out[i * 4 + b] = (v >> b) & 1; } return out; }
-  // The explored bit string pads each navmesh to a multiple of 4 triangles; rebuild the per-triangle index.
-  function exploredFor(d) {
-    if (d._exploredIdx) return d._exploredIdx;
-    const n = d.tris.length / 3, idx = new Uint8Array(n);
-    // Without per-mesh sizes from the plugin, padding only shifts by <4 per mesh; treat bits in order.
-    for (let i = 0; i < n; i++) idx[i] = local.bits ? local.bits[i] : 0;
-    d._exploredIdx = idx; return idx;
-  }
-  function drawFloor(ctx, toScreen, opt) {
-    const d = local.data; if (!d) return;
-    const v = d.verts, tr = d.tris, ex = exploredFor(d);
-    ctx.save();
-    ctx.globalAlpha = opt.alpha;
-    ctx.fillStyle = opt.paper ? "rgba(70,60,45,.55)" : "rgba(150,175,180,.30)";
-    ctx.strokeStyle = opt.paper ? "rgba(60,50,35,.35)" : "rgba(190,210,215,.20)";
-    ctx.lineWidth = .5;
-    ctx.beginPath();
-    for (let i = 0; i < tr.length; i += 3) {
-      if (!ex[i / 3]) continue;
-      const a = tr[i] * 3, b = tr[i + 1] * 3, c = tr[i + 2] * 3;
-      if (opt.onlyNearZ !== undefined && Math.abs(v[a + 2] - opt.onlyNearZ) > 450) continue;
-      const [x1, y1] = toScreen(v[a], v[a + 1]), [x2, y2] = toScreen(v[b], v[b + 1]), [x3, y3] = toScreen(v[c], v[c + 1]);
-      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.closePath();
-    }
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
-  }
   const localCv = $("localMap"), lctx = localCv.getContext("2d");
-  let localAlpha = store.get("localAlpha", .85);
-  function drawLocal() {
-    const w = localCv.clientWidth, h = localCv.clientHeight, s = app.state;
-    lctx.clearRect(0, 0, w, h);
-    lctx.fillStyle = `rgba(10,13,14,${localAlpha})`; lctx.fillRect(0, 0, w, h);
-    if (!s || !app.shown || !local.data || !local.data.tris) { $("mapNote").textContent = local.data ? "" : "Local map loads when you're in game"; return; }
-    // Fit the explored area, or a fixed window around you outdoors.
-    const d = local.data, v = d.verts, tr = d.tris, ex = exploredFor(d);
+  localCv.addEventListener("wheel", (e) => { e.preventDefault(); local.zoom = clamp(local.zoom * Math.exp(-e.deltaY * .0015), .4, 6); store.set("localZoom", local.zoom); }, { passive: false });
+  function drawLocal(t) {
+    fitCanvas(localCv);
+    const w = localCv.clientWidth, h = localCv.clientHeight, s = app.state, d = local.data, ctx = lctx;
+    ctx.fillStyle = "#0a0d0e"; ctx.fillRect(0, 0, w, h);
+    $("localName").textContent = d && d.interior ? (d.name || "Interior") : "";
+    if (!s || !app.shown || !d || !d.tris) { $("localNote").textContent = s ? "Loading…" : ""; return; }
+    const v = d.verts, tr = d.tris, ex = local.bits || new Uint8Array(0), pz = s.player.z;
+    // Interiors: fit the explored rooms. Outdoors: a window around you.
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let i = 0; i < tr.length; i += 3) { if (!ex[i / 3]) continue; for (let k = 0; k < 3; k++) { const a = tr[i + k] * 3; minX = Math.min(minX, v[a]); maxX = Math.max(maxX, v[a]); minY = Math.min(minY, v[a + 1]); maxY = Math.max(maxY, v[a + 1]); } }
-    if (!d.interior || !isFinite(minX)) { minX = app.shown.x - 7000; maxX = app.shown.x + 7000; minY = app.shown.y - 7000; maxY = app.shown.y + 7000; }
-    const pad = 400, sc = Math.min(w / (maxX - minX + pad * 2), h / (maxY - minY + pad * 2)) * app.localZoom, cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    if (d.interior) for (let i = 0; i < tr.length; i += 3) { if (!ex[i / 3]) continue; for (let k = 0; k < 3; k++) { const a = tr[i + k] * 3; minX = Math.min(minX, v[a]); maxX = Math.max(maxX, v[a]); minY = Math.min(minY, v[a + 1]); maxY = Math.max(maxY, v[a + 1]); } }
+    let cx, cy, span;
+    if (d.interior && isFinite(minX)) { cx = (minX + maxX) / 2; cy = (minY + maxY) / 2; span = Math.max(maxX - minX, maxY - minY, 2500) + 800; }
+    else { cx = app.shown.x; cy = app.shown.y; span = 9000; }
+    const sc = Math.min(w, h) / span * local.zoom;
+    if (d.interior && local.zoom > 1.05) { cx = app.shown.x; cy = app.shown.y; }  // zoomed in: follow you
     const toScreen = (x, y) => [(x - cx) * sc + w / 2, -(y - cy) * sc + h / 2];
-    drawFloor(lctx, toScreen, { alpha: 1 });
-    // Doors and location markers only, like the game's local map. No radar blips here.
-    lctx.fillStyle = "#d8b25a"; lctx.font = "12px " + FONT(); lctx.textAlign = "center";
-    for (const dr of d.doors || []) { const [x, y] = toScreen(dr.x, dr.y); lctx.fillRect(x - 3, y - 3, 6, 6); if (app.localZoom > 1.4 && dr.to) lctx.fillText(dr.to, x, y - 7); }
-    if (app.settings.localContainers !== false) { lctx.fillStyle = "#9a7a52"; for (const c of d.containers || []) { const [x, y] = toScreen(c.x, c.y); lctx.fillRect(x - 2, y - 2, 4, 4); } }
-    for (const o of d.ores || []) { const [x, y] = toScreen(o.x, o.y); lctx.fillStyle = o.depleted ? "#555" : "#b9c3c8"; lctx.beginPath(); lctx.moveTo(x, y - 4); lctx.lineTo(x + 4, y); lctx.lineTo(x, y + 4); lctx.lineTo(x - 4, y); lctx.closePath(); lctx.fill(); }
-    const [px, py] = toScreen(app.shown.x, app.shown.y); drawPlayer(lctx, px, py, app.shown.h, 11);
-    $("mapNote").textContent = d.interior ? (d.name || "Interior") + " · explored this session" : "Explored this session";
-  }
-  app.view_ = "world"; app.localZoom = 1; app.userView = null;
-  function setView(v, byUser) {
-    app.view_ = v; if (byUser) app.userView = v;
-    $("worldMap").style.display = v === "world" ? "" : "none"; localCv.style.display = v === "local" ? "" : "none";
-    $("btnWorld").classList.toggle("on", v === "world"); $("btnLocal").classList.toggle("on", v === "local");
-    if (v === "world") $("mapNote").textContent = "";
-  }
-  $("btnWorld").onclick = () => setView("world", true); $("btnLocal").onclick = () => setView("local", true);
-  let wasInterior = null;
-  function autoView(s) {
-    // The local map is always up indoors; outdoors you get the world map unless you picked otherwise.
-    const inside = !!(s.where && s.where.interior);
-    if (inside !== wasInterior) { wasInterior = inside; app.userView = null; setView(inside ? "local" : "world"); }
-  }
-
-  // ---------- opponent panel ----------
-  let focusMode = store.get("focusMode", "closest"), bestiaryCol = store.get("bestiaryCol", "vanilla");
-  function bestiaryTags(b) {
-    if (!b) return "";
-    const pick = (o) => (o && (o[bestiaryCol] && o[bestiaryCol].length ? o[bestiaryCol] : o.vanilla)) || [];
-    const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
-    return pick(b.weakness).map(x => `<span class="tag weak">Weak: ${esc(cap(x))}</span>`).join("") + pick(b.resistance).map(x => `<span class="tag res">Resists: ${esc(cap(x))}</span>`).join("");
-  }
-  function renderOpponent(s) {
-    const el = $("opp");
-    const foes = (s.radar || []).filter(b => b.hostile && !b.dead && b.name);
-    const cross = s.crosshair && s.crosshair.kind === "actor" && s.crosshair.hostile && !s.crosshair.dead ? s.crosshair : null;
-    $("oppMode").textContent = cross ? "Crosshair" : focusMode === "strongest" ? "Strongest" : "Closest";
-    if (!foes.length && !cross) { el.innerHTML = `<div class="empty">No enemies around</div>`; return; }
-    const sorted = foes.slice().sort((a, b) => a.dist - b.dist);
-    let f = cross ? { name: cross.name, level: cross.level, hp: cross.health && cross.health.cur, hpMax: cross.health && cross.health.max, bestiary: cross.bestiary, dist: null } :
-      focusMode === "strongest" ? foes.slice().sort((a, b) => b.level - a.level || b.hpMax - a.hpMax)[0] : sorted[0];
-    const pct = f.hpMax > 0 ? clamp(f.hp / f.hpMax, 0, 1) * 100 : 0;
-    el.innerHTML = `<div class="opp"><div class="row2"><span class="nm">${esc(f.name)}</span><span class="dim" style="margin-left:auto">Lv ${f.level}</span></div>
-      <div class="bar" style="height:7px;margin-top:3px"><i style="width:${pct}%;background:var(--health)"></i></div>
-      <div class="orow"><span class="dim num">${Math.round(f.hp || 0)} / ${Math.round(f.hpMax || 0)}</span><span class="r mute num">${f.dist != null ? Math.round(f.dist / 70) + " m" : ""}</span></div>
-      <div>${bestiaryTags(f.bestiary)}</div></div>` +
-      (sorted.length > 1 || cross ? `<div class="rule"></div>` + sorted.slice(0, 6).map(b => `<div class="orow"><span>${esc(b.name)}</span><span class="mute num">${b.level}</span><span class="r dim num">${b.hpMax > 0 ? Math.round(b.hp / b.hpMax * 100) : 0}% · ${Math.round(b.dist / 70)} m</span></div>`).join("") : "");
-  }
-
-  // ---------- effects: NumPad 0 steps through them for details ----------
-  let selEffect = -1;
-  function selectNextEffect() { selEffect++; if (app.state) renderEffects(app.state.effects); }
-
-  // ---------- sheets: books, log, settings ----------
-  function openSheet(title, html, tab) {
-    $("sheetTitle").textContent = title; $("sheetBody").innerHTML = html; $("sheet").classList.add("open");
-    for (const id of ["tabHub", "tabBooks", "tabLog", "tabSettings"]) $(id).classList.toggle("on", id === (tab || "tabHub"));
-  }
-  function closeSheet() { $("sheet").classList.remove("open"); for (const id of ["tabBooks", "tabLog", "tabSettings"]) $(id).classList.remove("on"); $("tabHub").classList.add("on"); }
-  function bookGroup(b) { return b.quest ? "Quest items" : /\bmap\b/i.test(b.name) ? "Maps" : b.note ? "Notes and letters" : b.skill ? "Skill books" : "Books"; }
-  function openBooks() {
-    const books = (app.state && app.state.books) || [];
-    const groups = ["Quest items", "Notes and letters", "Maps", "Skill books", "Books"];
-    let html = books.length ? "" : `<div class="empty">No books, notes or maps on you.</div>`;
-    for (const g of groups) {
-      const items = books.filter(b => bookGroup(b) === g).sort((a, b) => a.name.localeCompare(b.name));
-      if (!items.length) continue;
-      html += `<details open><summary class="grp" style="cursor:pointer">${g} · ${items.length}</summary>` + items.map(b => `<div class="row2" data-book="${b.id}" style="cursor:pointer"><span>${esc(b.name)}</span>${b.skill ? `<span class="mute">${esc(b.skill)}</span>` : ""}<span class="${b.read ? "mute" : "goldc"}" style="margin-left:auto">${b.read ? "read" : "unread"}</span></div>`).join("") + `</details>`;
-    }
-    openSheet("Books", html + `<div id="bookView" style="margin-top:10px"></div>`, "tabBooks");
-    $("sheetBody").onclick = async (e) => {
-      const row = e.target.closest("[data-book]"); if (!row) return;
-      $("bookView").innerHTML = `<div class="empty">Opening…</div>`;
-      try { const r = await fetchJson("/api/book/" + (+row.dataset.book).toString(16)); $("bookView").innerHTML = `<div class="book"><h3 style="text-align:center;font-weight:400">${esc(r.name)}</h3>${bookHtml(r.text || "")}</div>`; $("bookView").scrollIntoView({ block: "nearest" }); }
-      catch { $("bookView").innerHTML = `<div class="empty">Couldn't open that one right now.</div>`; }
-    };
-  }
-  // Skyrim book text uses a small HTML subset. Keep only safe formatting tags.
-  function bookHtml(text) {
-    const src = text.replace(/\[pagebreak\]/gi, "<hr>").replace(/<img[^>]*>/gi, "<i>[picture]</i>").replace(/\r?\n/g, "<br>");
-    const doc = new DOMParser().parseFromString(`<div>${src}</div>`, "text/html");
-    const ok = new Set(["P", "BR", "B", "I", "U", "FONT", "HR", "DIV", "SPAN"]);
-    const walk = (node) => {
-      for (const c of [...node.childNodes]) {
-        if (c.nodeType === 1) {
-          if (!ok.has(c.tagName)) { c.replaceWith(...c.childNodes); continue; }
-          const align = c.getAttribute("align"), size = c.getAttribute("size"), color = c.getAttribute("color");
-          for (const a of [...c.attributes]) c.removeAttribute(a.name);
-          if (align && /^(left|right|center)$/i.test(align)) c.style.textAlign = align;
-          if (c.tagName === "FONT" && size && /^\d+$/.test(size)) c.style.fontSize = Math.max(11, Math.min(40, +size)) + "px";
-          if (c.tagName === "FONT" && color && /^#?[0-9a-f]{6}$/i.test(color)) c.style.color = color.startsWith("#") ? color : "#" + color;
-          walk(c);
-        }
+    // Floors near your height are bright; floors above or below are faint.
+    for (const pass of [0, 1]) {
+      ctx.beginPath();
+      for (let i = 0; i < tr.length; i += 3) {
+        if (!ex[i / 3]) continue;
+        const a = tr[i] * 3, b = tr[i + 1] * 3, c = tr[i + 2] * 3, near = Math.abs((v[a + 2] + v[b + 2] + v[c + 2]) / 3 - pz) < 400;
+        if (near !== (pass === 1)) continue;
+        const [x1, y1] = toScreen(v[a], v[a + 1]), [x2, y2] = toScreen(v[b], v[b + 1]), [x3, y3] = toScreen(v[c], v[c + 1]);
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.closePath();
       }
-    };
-    walk(doc.body);
-    return doc.body.firstChild.innerHTML;
-  }
-  async function openLog() {
-    openSheet("Log", `<div class="empty">Loading…</div>`, "tabLog");
-    let text = "", folder = "";
-    try { const r = await fetch(BASE + "/api/log", { cache: "no-store" }); text = await r.text(); } catch {}
-    try { folder = (await fetchJson("/api/logfolder")).folder; } catch {}
-    const lines = text.trim().split(/\r?\n/).filter(Boolean).reverse();
-    $("sheetBody").innerHTML = `<div class="dim" style="font-size:12px;margin-bottom:6px">Saved in ${esc(folder || "Documents\\Skyrim Companion")} · newest first · open the file in Notepad any time</div>
-      <div class="logtext">${lines.length ? lines.map(esc).join("\n") : "Nothing logged yet. Deaths, hires and dismissals of followers show up here."}</div>`;
-  }
-
-  // ---------- layout: panel toggles and simple snap layout ----------
-  const PANELS = { opponent: "Opponent", party: "Party", minimap: "Mini map", map: "Map", crosshair: "Crosshair", alerts: "Alerts", calendar: "Calendar", character: "Character", survival: "Survival", equipment: "Equipment", effects: "Effects", supplies: "Supplies" };
-  let layout = Object.assign({ hidden: [], cols: [22, 50, 28] }, store.get("layout", {}));
-  function applyLayout() {
-    for (const [k] of Object.entries(PANELS)) { const el = document.querySelector(`[data-panel="${k}"]`); if (el) el.style.display = layout.hidden.includes(k) ? "none" : ""; }
-    const c = layout.cols; document.querySelector(".grid").style.gridTemplateColumns = window.innerWidth > 1100 ? `minmax(240px, ${c[0]}fr) minmax(0, ${c[1]}fr) minmax(280px, ${c[2]}fr)` : "";
-  }
-  const CONTAINERS = ["colL", "colC", "lowRow", "colR", "splitRow"];
-  function saveOrder() { layout.order = {}; for (const id of CONTAINERS) layout.order[id] = [...$(id).children].map(c => c.dataset.panel || c.id).filter(Boolean); store.set("layout", layout); }
-  function applyOrder() {
-    if (!layout.order) return;
-    for (const id of CONTAINERS) for (const key of layout.order[id] || []) { const el = document.querySelector(`[data-panel="${key}"]`) || $(key); if (el && el !== $(id) && !el.contains($(id))) $(id).appendChild(el); }
-  }
-  applyOrder(); applyLayout(); window.addEventListener("resize", applyLayout);
-  // Edit mode: drag a panel onto another panel to put it there; drop on an empty part of a column to add it at the end.
-  let dragged = null;
-  function setEdit(on) {
-    document.body.classList.toggle("edit", on); $("editDone").style.display = on ? "" : "none";
-    for (const el of document.querySelectorAll("[data-panel]")) el.draggable = on;
-  }
-  $("editDone").onclick = () => { setEdit(false); saveOrder(); };
-  document.addEventListener("dragstart", (e) => { if (!document.body.classList.contains("edit")) return; dragged = e.target.closest("[data-panel]"); });
-  document.addEventListener("dragover", (e) => { if (!dragged) return; e.preventDefault(); for (const x of document.querySelectorAll(".dragover")) x.classList.remove("dragover"); const tgt = e.target.closest("[data-panel]"); if (tgt && tgt !== dragged) tgt.classList.add("dragover"); });
-  document.addEventListener("drop", (e) => {
-    if (!dragged) return; e.preventDefault();
-    for (const x of document.querySelectorAll(".dragover")) x.classList.remove("dragover");
-    const tgt = e.target.closest("[data-panel]"), box = e.target.closest(CONTAINERS.map(c => "#" + c).join(","));
-    if (tgt && tgt !== dragged && !dragged.contains(tgt)) tgt.parentNode.insertBefore(dragged, tgt);
-    else if (box && !dragged.contains(box)) box.appendChild(dragged);
-    dragged = null; saveOrder(); applyLayout();
-  });
-
-  // ---------- settings ----------
-  async function openSettings() {
-    const s = app.state || {};
-    const sl = s.partySlots || {};
-    const names = (s.followers || []).map(f => f.name);
-    const hidden = (s.effects || []).filter(e => e.hidden && e.name);
-    let html = `<div class="grp">Hotkeys in game</div>` +
-      [["Num +", "Zoom map in"], ["Num −", "Zoom map out"], ["Num *", "Switch world / local map"], ["Num .", "Show undiscovered markers"], ["Num /", "Show abilities"], ["Num 0", "Step through active effects"], ["V", "Health potion (Smart Optimal Salves)"], ["B", "Magicka potion"], ["N", "Stamina potion"]]
-        .map(k => `<div class="row2"><span class="key">${k[0]}</span><span>${k[1]}</span></div>`).join("") + `<div id="hkMore"></div>`;
-    html += `<div class="grp" style="margin-top:12px">Skills to track</div><div id="skillPick">` +
-      ((s.progress && s.progress.skills) || []).map(x => `<label><input type="checkbox" value="${esc(x.name)}" ${(chosenSkills || []).includes(x.name) ? "checked" : ""}> ${esc(x.name)}</label>`).join("") +
-      `</div><div class="mute" style="font-size:12px">None ticked shows your four highest skills.</div>`;
-    html += `<div class="grp" style="margin-top:12px">Opponent focus</div>
-      <label><input type="radio" name="fm" value="closest" ${focusMode === "closest" ? "checked" : ""}> Closest</label><label><input type="radio" name="fm" value="strongest" ${focusMode === "strongest" ? "checked" : ""}> Strongest</label>
-      <span class="mute" style="font-size:12px">Your crosshair always takes over.</span>
-      <div style="margin-top:4px"><span class="dim">Bestiary weaknesses from:</span> ${["vanilla", "r&w", "kye2", "req"].map(c => `<label><input type="radio" name="bc" value="${c}" ${bestiaryCol === c ? "checked" : ""}> ${c === "vanilla" ? "Vanilla" : c === "r&w" ? "Resistances & Weaknesses" : c === "kye2" ? "KYE" : "Requiem"}</label>`).join("")}</div>`;
-    html += `<div class="grp" style="margin-top:12px">Party</div>
-      <div class="dim" style="font-size:13px">Vanilla follower ${sl.followers >= 0 ? Math.round(sl.followers) : "?"} / 1 · Animal ${sl.animals >= 0 ? Math.round(sl.animals) : "?"} / 1 · Tamed ${sl.tamed1 >= 0 ? (sl.tamed1 > 0) + (sl.tamed2 > 0) : "?"} / ${1 + Math.max(0, sl.packLeader || 0)} · Interesting NPCs and modded followers use their own systems</div>
-      <div id="colorPick">${names.map(n => `<label>${esc(n)} <input type="color" data-name="${esc(n)}" value="${followerColor(n)}">
-        <select data-shape="${esc(n)}">${["dot", "diamond", "square", "triangle"].map(sh => `<option ${followerShape(n) === sh ? "selected" : ""}>${sh}</option>`).join("")}</select></label>`).join("") || '<span class="mute">No followers yet</span>'}</div>`;
-    html += `<div class="grp" style="margin-top:12px">Local map</div>
-      <label>Background <input type="range" id="lmAlpha" min="0.2" max="1" step="0.05" value="${localAlpha}"></label>
-      <label><input type="checkbox" id="lmCont" ${app.settings.localContainers !== false ? "checked" : ""}> Show containers</label>`;
-    html += `<div class="grp" style="margin-top:12px">Panels</div><div id="panelPick">` +
-      Object.entries(PANELS).map(([k, n]) => `<label><input type="checkbox" value="${k}" ${layout.hidden.includes(k) ? "" : "checked"}> ${n}</label>`).join("") + `</div>
-      <div style="margin-top:4px"><button class="chipbtn" id="editLayout">Edit layout (drag panels)</button> <button class="chipbtn" id="resetLayout">Reset layout</button></div>
-      <div style="margin-top:4px"><span class="dim">Column widths</span> ${[0, 1, 2].map(i => `<input type="range" class="colw" data-i="${i}" min="10" max="70" step="2" value="${layout.cols[i]}">`).join(" ")}</div>`;
-    html += `<div class="grp" style="margin-top:12px">Log folder</div>
-      <input type="text" id="logFolder" placeholder="C:\\Users\\You\\Documents\\Skyrim Companion"> <button class="chipbtn" id="logSave">Save</button> <span class="mute" id="logMsg"></span>`;
-    html += `<div class="grp" style="margin-top:12px">Hidden effects · ${hidden.length}</div><div class="dim" style="font-size:12px">${hidden.map(e => esc(e.name)).join(" · ") || "None right now"}</div>`;
-    openSheet("Settings", html, "tabSettings");
-    $("skillPick").onchange = () => { chosenSkills = [...$("skillPick").querySelectorAll("input:checked")].map(i => i.value); store.set("skills", chosenSkills); };
-    for (const r of document.getElementsByName("fm")) r.onchange = () => { focusMode = r.value; store.set("focusMode", focusMode); };
-    for (const r of document.getElementsByName("bc")) r.onchange = () => { bestiaryCol = r.value; store.set("bestiaryCol", bestiaryCol); };
-    for (const c of $("colorPick").querySelectorAll("input[type=color]")) c.oninput = () => { colorMap[c.dataset.name] = c.value; store.set("followerColors", colorMap); };
-    for (const c of $("colorPick").querySelectorAll("select[data-shape]")) c.onchange = () => { shapeMap[c.dataset.shape] = c.value; store.set("followerShapes", shapeMap); };
-    $("editLayout").onclick = () => { closeSheet(); setEdit(true); };
-    $("resetLayout").onclick = () => { store.set("layout", {}); location.reload(); };
-    $("lmAlpha").oninput = () => { localAlpha = +$("lmAlpha").value; store.set("localAlpha", localAlpha); };
-    $("lmCont").onchange = () => { app.settings.localContainers = $("lmCont").checked; store.set("settings", app.settings); };
-    $("panelPick").onchange = () => { layout.hidden = [...$("panelPick").querySelectorAll("input")].filter(i => !i.checked).map(i => i.value); store.set("layout", layout); applyLayout(); };
-    for (const r of document.querySelectorAll(".colw")) r.oninput = () => { layout.cols[+r.dataset.i] = +r.value; store.set("layout", layout); applyLayout(); };
-    try { $("logFolder").value = (await fetchJson("/api/logfolder")).folder || ""; } catch {}
-    $("logSave").onclick = async () => {
-      try { const r = await fetchJson("/api/setlogfolder/" + encodeURIComponent($("logFolder").value.trim())); $("logMsg").textContent = r.ok ? "Saved" : r.error; } catch { $("logMsg").textContent = "Game not reachable"; }
-    };
-    try {
-      const hk = await fetchJson("/api/hotkeys"), keys = hk.keys || {};
-      const bound = Object.entries(keys).filter(([, v]) => v && v.label);
-      if (bound.length) $("hkMore").innerHTML = `<div class="mute" style="font-size:12px;margin-top:4px">From Hotkey Reminder:</div>` + bound.map(([k, v]) => `<div class="row2"><span class="key">${esc(k.toUpperCase())}</span><span>${esc(v.label)}</span></div>`).join("");
-    } catch {}
-  }
-  $("tabSettings").onclick = openSettings; $("tabBooks").onclick = openBooks; $("tabLog").onclick = openLog; $("tabHub").onclick = closeSheet; $("sheetClose").onclick = closeSheet;
-  $("sheet").onclick = (e) => { if (e.target === $("sheet")) closeSheet(); };
-
-  // ---------- demo (open with ?demo) ----------
-  function startDemo() {
-    app.demo = true; $("banner").style.display = "none";
-    let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const types = [1, 2, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 15, 17, 20, 21, 25, 27, 28, 29];
-    const markers = []; for (let i = 0; i < 120; i++) markers.push({ ref: "", name: "Demo place " + (i + 1), x: (rnd() - .45) * 380000, y: (rnd() - .5) * 200000 - 10000, type: types[Math.floor(rnd() * types.length)], seen: rnd() > .15, discovered: rnd() > .4 });
-    onMarkers({ markers });
-    let t = 0;
-    setInterval(() => {
-      t += .002; const x = Math.cos(t) * 70000 + 10000, y = Math.sin(t) * 40000 + 5000, heading = (Math.atan2(-Math.sin(t) * 70000, Math.cos(t) * 40000) * 180 / Math.PI + 360) % 360;
-      const fight = Math.sin(t * 9) > .85;
-      onState({ ready: true,
-        player: { name: "Demo", level: 31, x, y, z: 0, heading, gold: 4210, inCombat: fight, sneaking: Math.sin(t * 5) > .6, mounted: false },
-        stats: { health: { cur: 380 + 60 * Math.sin(t * 20), max: 440 }, magicka: { cur: 290, max: 360 }, stamina: { cur: 150, max: 240 } },
-        where: { worldspaceId: 60, worldspace: "Skyrim", worldspaceEdid: "Tamriel", cell: "", interior: false, location: "Whiterun Hold" },
-        time: { hour: (9 + t * 40) % 24, day: 17, dayName: "Morndas", month: "Last Seed", year: 201 },
-        followers: [
-          { name: "Lydia", level: 28, health: { cur: Math.sin(t * 7) > .9 ? 5 : 310, max: 420 }, magicka: { cur: 50, max: 50 }, stamina: { cur: 200, max: 260 }, status: Math.sin(t * 7) > .9 ? "Downed" : fight ? "In combat" : "Following", dead: false, mounted: false, sameSpace: true, distance: 420, x: x - 300, y: y - 250, worldspaceId: 60, interior: false, cell: "", location: "Whiterun Hold" },
-          { name: "Meeko", level: 10, health: { cur: 40, max: 160 }, magicka: { cur: 0, max: 0 }, stamina: { cur: 80, max: 100 }, status: "Following", dead: false, mounted: false, sameSpace: true, distance: 180, x: x + 150, y: y - 80, worldspaceId: 60, interior: false, cell: "", location: "Whiterun Hold" },
-          { name: "Serana", level: 31, health: { cur: 380, max: 380 }, magicka: { cur: 300, max: 300 }, stamina: { cur: 200, max: 200 }, status: "Away", dead: false, mounted: false, sameSpace: false, distance: -1, x: 0, y: 0, worldspaceId: 0, interior: true, cell: "Breezehome", location: "Whiterun" }],
-        effects: [
-          { name: "Fortify Destruction", spell: "Potion of the Warlock", spellType: 7, item: "", caster: "You", mag: 25, dur: 60, elapsed: (t * 900) % 60, archetype: 0, av: 20, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false },
-          { name: "Frostbite", spell: "Frostbite", spellType: 0, item: "", caster: "Ice Wraith", mag: 8, dur: 5, elapsed: (t * 900) % 5, archetype: 0, av: 24, resist: 43, detrimental: true, recover: false, hidden: false, inactive: false },
-          { name: "Breton Magic Resistance", spell: "Magic Resistance", spellType: 4, item: "", caster: "You", mag: 25, dur: 0, elapsed: 0, archetype: 0, av: 44, resist: -1, detrimental: false, recover: true, hidden: false, inactive: false }],
-        survival: { enabled: 1, ambientCold: 120, hunger: { name: "Hunger", value: (t * 3000) % 600, max: 600, stage: -1, thresholds: [60, 160, 240, 360, 480] }, cold: { name: "Cold", value: 210, max: 1000, stage: -1, thresholds: [100, 200, 400, 600, 800] }, fatigue: { name: "Fatigue", value: 130, max: 600, stage: -1, thresholds: [60, 120, 240, 360, 480] } },
-        equipment: { right: { name: "Steel Sword", kind: "weapon", weaponType: 1, damage: 11, enchant: "" }, left: { name: "Flames", kind: "spell", effects: [] }, ammo: { name: "Iron Arrow", count: 7, bolt: false }, power: { name: "Unrelenting Force", shout: true },
-          worn: [{ slot: "head", name: "Steel Helmet", armor: 19, weight: "heavy", enchant: "" }, { slot: "body", name: "Steel Armor", armor: 36, weight: "heavy", enchant: "" }, { slot: "hands", name: "Steel Gauntlets", armor: 14, weight: "heavy", enchant: "" }, { slot: "feet", name: "Steel Boots", armor: 14, weight: "heavy", enchant: "" }],
-          armorRating: 214, carry: { cur: 212, max: 300 }, resists: { fire: 15, frost: 0, shock: 0, magic: 10, poison: 0, disease: 0 } },
-        progress: { xp: 640, threshold: 1000, skills: ["One-handed", "Two-handed", "Archery", "Block", "Smithing", "Heavy Armor", "Light Armor", "Pickpocket", "Lockpicking", "Sneak", "Alchemy", "Speech", "Alteration", "Conjuration", "Destruction", "Illusion", "Restoration", "Enchanting"].map((n, i) => ({ name: n, level: 15 + (i * 7) % 40, xp: (i === 4 ? (t * 4000) % 300 : 120), threshold: 300 })) },
-        warmth: { rating: 115, cap: 200, uiLevel: fight ? 0 : 1, restore: [15, 40, 90, 160] },
-        shoutCooldown: fight ? 12 : 0,
-        radar: [{ id: 1, x: x + 1200, y: y + 800, dist: 1440, state: fight ? "combat" : "seen", name: "Draugr Wight", hostile: true, level: 20, hp: 288, hpMax: 400, seesMe: Math.sin(t * 5) > .6, bestiary: { creature: "draugr", weakness: { vanilla: ["fire"] }, resistance: { vanilla: ["frost"] } } },
-          { id: 2, x: x - 2500, y: y + 1500, dist: 2900, state: "seen", hostile: undefined }, { id: 3, x: x + 3000, y: y - 2000, dist: 3600, state: fight ? "ping" : "seen" }],
-        character: { health: { levels: 10 }, magicka: { levels: 3 }, stamina: { levels: 9 } },
-        stress: { value: 34, max: 100, enabled: true },
-        books: [{ id: 1, name: "Note from Lucan", quest: true, read: true }, { id: 2, name: "Heavy Armor Forging", skill: "Smithing", read: false }],
-        partySlots: { followers: 1, animals: 1, tamed1: 1, tamed2: 0, packLeader: 1, pet1Hunger: 2, pet2Hunger: 0 },
-        mapOpened: true,
-        supplies: { lockpicks: 14, soulGems: [{ capacity: 1, soul: 0, count: 2, black: false }, { capacity: 5, soul: 3, count: 1, black: false }], food: [{ name: "Venison Stew", count: 4, tier: 3 }, { name: "Apple", count: 3, tier: 1 }], bounties: [{ faction: "Crime Faction Falkreath", bounty: 40 }] },
-        quests: [{ quest: "Bleak Falls Barrow", text: "Find the Dragonstone", index: 10 }, { quest: "Bleak Falls Barrow", text: "Retrieve the Dragonstone", index: 20 }],
-        crosshair: { name: "Steel War Axe", kind: "weapon", weaponType: 3, damage: 12, value: 55, weight: 13, owner: "Belethor", stealing: true, compare: { name: "Steel Sword", damage: 8 } },
-        events: [{ id: 1 + Math.floor(t * 50), text: "Picked up Iron Ore (2)", kind: "pickup" }],
-        consumables: [
-          { name: "Potion of Plentiful Healing", count: 6, kind: "potion", effects: [{ name: "Restore Health", mag: 100, dur: 0, av: 24, archetype: 0, detrimental: false, recover: false }] },
-          { name: "Potion of Extreme Magicka", count: 2, kind: "potion", effects: [{ name: "Restore Magicka", mag: 150, dur: 0, av: 25, archetype: 0, detrimental: false, recover: false }] },
-          { name: "Draught of Vigorous Stamina", count: 4, kind: "potion", effects: [{ name: "Restore Stamina", mag: 75, dur: 0, av: 26, archetype: 0, detrimental: false, recover: false }] },
-          { name: "Potion of Cure Disease", count: 1, kind: "potion", effects: [{ name: "Cure Disease", mag: 0, dur: 0, av: -1, archetype: 3, detrimental: false, recover: false }] },
-          { name: "Venison Stew", count: 4, kind: "food", effects: [] }] });
-    }, 150);
-  }
-
-  // ---------- frame loop ----------
-  function fitCanvas(c) { const dpr = window.devicePixelRatio || 1, w = Math.round(c.clientWidth * dpr), h = Math.round(c.clientHeight * dpr); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } c.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0); }
-  function frame(t) {
-    if (app.state && app.shown) {
-      const p = app.state.player; app.shown.x += (p.x - app.shown.x) * .25; app.shown.y += (p.y - app.shown.y) * .25;
-      const dh = ((p.heading - app.shown.h + 540) % 360) - 180; app.shown.h = (app.shown.h + dh * .3 + 360) % 360;
+      ctx.fillStyle = pass ? "rgba(190,200,195,.42)" : "rgba(120,130,130,.12)"; ctx.fill();
+      ctx.strokeStyle = pass ? "rgba(210,220,215,.18)" : "rgba(150,160,160,.06)"; ctx.lineWidth = .5; ctx.stroke();
     }
-    fitCanvas(mini); drawMini(t);
-    if (app.view_ === "local") { fitCanvas(localCv); drawLocal(); } else { fitCanvas(world); drawWorld(t); }
+    ctx.font = "12px " + FONT(); ctx.textAlign = "center";
+    for (const dr of d.doors || []) {
+      const [x, y] = toScreen(dr.x, dr.y); if (x < -10 || y < -10 || x > w + 10 || y > h + 10) continue;
+      ctx.fillStyle = "#d8b25a"; ctx.fillRect(x - 3, y - 3, 6, 6);
+      if (dr.to && sc > .05) { ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.85)"; ctx.strokeText(dr.to, x, y - 8); ctx.fillText(dr.to, x, y - 8); }
+    }
+    for (const tg of activeTargets(s)) {
+      const here = s.where.interior ? tg.interior && tg.cellId === s.where.cellId : !tg.interior && tg.worldspaceId === s.where.worldspaceId;
+      if (!here) continue;
+      const [x, y] = toScreen(tg.x, tg.y);
+      drawQuestDiamond(ctx, clamp(x, 10, w - 10), clamp(y, 14, h - 14), t);
+    }
+    const [px, py] = toScreen(app.shown.x, app.shown.y); drawPlayer(ctx, px, py, app.shown.h, 10);
+    $("localNote").textContent = isFinite(minX) || !d.interior ? "" : "Walk around to reveal the map";
+  }
+
+  // ---------- render loop: smooth the player arrow between readings ----------
+  function frame(t) {
+    const s = app.state;
+    if (s && app.shown) {
+      const k = 0.25, p = s.player; app.shown.x += (p.x - app.shown.x) * k; app.shown.y += (p.y - app.shown.y) * k;
+      let dh = ((p.heading - app.shown.h + 540) % 360) - 180; app.shown.h = (app.shown.h + dh * k + 360) % 360;
+    }
+    drawWorld(t); drawLocal(t);
     requestAnimationFrame(frame);
   }
+
+  // ---------- demo (open with ?demo to preview without the game) ----------
+  function startDemo() {
+    app.demo = true;
+    const sk = ["One-handed", "Two-handed", "Archery", "Block", "Smithing", "Heavy Armor", "Light Armor", "Pickpocket", "Lockpicking", "Sneak", "Alchemy", "Speech", "Alteration", "Conjuration", "Destruction", "Illusion", "Restoration", "Enchanting"];
+    // A small two-room floor plan for the local map.
+    const verts = [], tris = [];
+    const room = (x0, y0, x1, y1, z) => { const b = verts.length / 3; verts.push(x0, y0, z, x1, y0, z, x1, y1, z, x0, y1, z); tris.push(b, b + 1, b + 2, b, b + 2, b + 3); };
+    room(-1200, -800, 400, 600, 0); room(400, -200, 1800, 200, 0); room(1800, -900, 2800, 900, 0); room(-1200, 600, -400, 1600, 300);
+    local.data = { version: 1, interior: true, name: "Bleak Falls Barrow", verts, tris, doors: [{ x: -1200, y: 0, to: "Skyrim" }, { x: 2800, y: 0, to: "Bleak Falls Sanctum" }] };
+    local.bits = new Uint8Array(tris.length / 3).fill(1);
+    let tick = 0;
+    setInterval(() => {
+      tick++;
+      onState({ ready: true, mapOpened: true,
+        player: { name: "Dovahkiin", level: 14, x: Math.sin(tick / 30) * 1200, y: Math.cos(tick / 40) * 300, z: 0, heading: (tick * 4) % 360 },
+        where: { worldspaceId: 0x3C, worldspace: "Skyrim", worldspaceEdid: "Tamriel", cell: "Bleak Falls Barrow", cellId: 1, interior: true, location: "Bleak Falls Barrow" },
+        time: { hour: 14.5, day: 17, dayName: "Middas", month: "Last Seed", year: 201 },
+        progress: { xp: 340, threshold: 625, skills: sk.map((n, i) => ({ name: n, level: 15 + (i * 7) % 40, xp: (i * 37 + tick) % 100, threshold: 100 })) },
+        quests: [
+          { id: 1, name: "Bleak Falls Barrow", active: true, type: 1, objectives: [{ text: "Retrieve the Dragonstone", targets: [{ x: 2600, y: 400, interior: true, cellId: 1, cell: "Bleak Falls Barrow" }] }] },
+          { id: 2, name: "The Golden Claw", active: true, type: 6, objectives: [{ text: "Find the golden claw" }, { text: "Return the golden claw to Lucan" }] },
+          { id: 3, name: "Blood on the Ice", active: false, type: 8, objectives: [{ text: "Talk to the guard" }] },
+          { id: 4, name: "The Wolf Queen Awakened", active: false, type: 8, objectives: [{ text: "Meet Falk Firebeard" }] }],
+        effects: [
+          { name: "Fortify One-handed", spell: "Potion of the Warrior", spellType: 7, archetype: 34, av: 6, mag: 20, dur: 60, elapsed: tick % 60, detrimental: false, recover: true },
+          { name: "Frostbite", spell: "Frostbite", spellType: 0, archetype: 0, av: 26, resist: 43, mag: 8, dur: 5, elapsed: 1, detrimental: true, caster: "Draugr" },
+          { name: "Well Rested", spellType: 4, archetype: 0, av: 96, mag: 10, dur: 0, elapsed: 0, detrimental: false, recover: true },
+          { name: "Nord Frost Resistance", spellType: 4, archetype: 0, av: 43, mag: 50, dur: 0, elapsed: 0, detrimental: false }]
+      });
+    }, 100);
+  }
+
+  // ---------- start ----------
   (async () => {
-    const demo = new URLSearchParams(location.search).has("demo"); if (demo) app.demo = true;
     await loadStatic();
-    if (demo) startDemo(); else { setInterval(pollState, 150); setInterval(pollMarkers, 5000); setInterval(pollLocal, 1500); pollState(); pollMarkers(); }
+    if (/[?&]demo\b/.test(location.search)) startDemo();
+    else { setInterval(pollState, 100); setInterval(pollMarkers, 5000); setInterval(pollLocal, 1000); pollMarkers(); }
     requestAnimationFrame(frame);
   })();
 })();
