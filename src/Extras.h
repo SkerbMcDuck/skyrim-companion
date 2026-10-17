@@ -13,5 +13,8 @@ namespace companion::extras
 	json  Books(RE::PlayerCharacter* a_player);        // books, notes and maps you carry
 	std::string BookText(RE::FormID a_id);             // game thread: the book's own text
 	json  Character(RE::PlayerCharacter* a_player);    // race start values and level-up spread
-	json  Stress();                                    // Stress and Fear  // Random Mining values, or null if not an ore vein
+	json  Stress();                                    // Stress and Fear
+	json  World();                                     // season and moon timing
+	void  RequestSeason();                             // asks Seasons of Skyrim (answer arrives later)
+	json  OreRange(const json& a_vein, RE::PlayerCharacter* a_player);  // Random Mining values, or null if not an ore vein
 }

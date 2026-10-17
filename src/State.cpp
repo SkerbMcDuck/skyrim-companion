@@ -18,6 +18,7 @@ namespace companion::state
 		std::atomic<bool> g_rescanMarkers{ true };
 		std::atomic<bool> g_mapOpened{ false };  // markers load the first time the map screen opens
 		int               g_ticksSinceLocalMap = 0;
+		int               g_ticksSinceSeason = 290;
 
 		std::mutex  g_lock;
 		std::string g_stateJson = R"({"ready":false})";
@@ -191,6 +192,11 @@ namespace companion::state
 					state["radar"] = safely("Radar", [&] { return radar::Build(player); });
 					state["stress"] = safely("Stress", [] { return extras::Stress(); });
 					state["mapOpened"] = g_mapOpened.load();
+					if (++g_ticksSinceSeason >= 300) {
+						g_ticksSinceSeason = 0;
+						safely("Season", [] { extras::RequestSeason(); return json(nullptr); });
+					}
+					state["world"] = safely("World", [] { return extras::World(); });
 					if (++g_ticksSinceLocalMap >= 3) {
 						g_ticksSinceLocalMap = 0;
 						safely("Local map", [&] { localmap::Tick(player); return json(nullptr); });

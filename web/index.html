@@ -104,6 +104,8 @@
   .cal th { color: var(--fg-mute); font-weight: 400; padding: 1px; }
   .cal td { padding: 1px; color: var(--fg-dim); }
   .cal td.today { color: var(--bg); background: var(--fg); }
+  .cal td.hol { color: var(--gold); text-decoration: underline; }
+  .calfoot { font-size: 12px; color: var(--fg-dim); display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 4px; }
 
   /* right */
   .charhead { display: flex; align-items: center; gap: 10px; }
@@ -169,13 +171,14 @@
   .book hr { border: 0; border-top: 1px dashed #9a8a6a; margin: 18px 0; }
   .logtext { font-family: Consolas, monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; color: var(--fg-dim); max-height: 60vh; overflow: auto; }
   .sheet input[type=text] { font: 13px var(--font); background: #111; color: var(--fg); border: 1px solid var(--line); padding: 3px 6px; width: 420px; max-width: 100%; }
-  .edit .panel { outline: 1px dashed var(--gold); }
+  .edit .panel[data-panel] { outline: 1px dashed var(--gold); cursor: grab; }
+  .edit .panel.dragover { outline: 2px solid var(--gold); }
   .pmove { display: none; gap: 2px; margin-left: 6px; }
   .edit .pmove { display: inline-flex; }
   .pmove button { font: 11px var(--font); background: #1a1c1d; color: var(--fg); border: 1px solid var(--line); padding: 0 5px; cursor: pointer; }
 
   /* settings / log pages */
-  .sheet { position: fixed; inset: 0; background: rgba(5,6,7,.85); display: none; justify-content: center; align-items: flex-start; padding: 50px 16px 24px; z-index: 5; overflow: auto; }
+  .sheet { position: fixed; inset: 36px 0 0 0; background: rgba(5,6,7,.85); display: none; justify-content: center; align-items: flex-start; padding: 14px 16px 24px; z-index: 5; overflow: auto; }
   .sheet.open { display: flex; }
   .sheet .panel { width: min(760px, 100%); }
   .row2 { display: flex; gap: 10px; align-items: baseline; padding: 2px 0; }
@@ -206,7 +209,7 @@
 
   <div class="grid">
     <!-- LEFT -->
-    <div class="col left">
+    <div class="col left" id="colL">
       <section class="panel" data-panel="opponent">
         <div class="ph"><h2>Opponent</h2><span class="meta" id="oppMode"></span></div>
         <div class="pb" id="opp"><div class="empty">No enemies around</div></div>
@@ -219,7 +222,7 @@
     </div>
 
     <!-- CENTER -->
-    <div class="col center">
+    <div class="col center" id="colC">
       <section class="panel mapp" data-panel="map">
         <div class="maphead">
           <span class="loc" id="whereBig">—</span><span class="loc2" id="whereSmall"></span>
@@ -241,7 +244,7 @@
           <div class="tooltip" id="tooltip"></div>
         </div>
       </section>
-      <div class="lowrow">
+      <div class="lowrow" id="lowRow">
         <section class="panel det" data-panel="crosshair"><div class="ph"><h2>Crosshair</h2></div><div class="pb" id="det"><div class="empty">Look at something</div></div></section>
         <section class="panel alerts" id="alerts" data-panel="alerts"><div class="ph"><h2>Alerts</h2><span class="meta">clears on load</span></div><div class="pb"><div class="list" id="events"><div class="empty">Nothing yet</div></div></div></section>
         <section class="panel cal" data-panel="calendar"><div class="ph"><h2 id="calMonth">Calendar</h2><span class="meta" id="calYear"></span></div><div class="pb" id="cal"></div></section>
@@ -249,7 +252,7 @@
     </div>
 
     <!-- RIGHT -->
-    <div class="col right">
+    <div class="col right" id="colR">
       <section class="panel" data-panel="character">
         <div class="pb">
           <div class="charhead">
@@ -284,7 +287,7 @@
         </div>
       </section>
 
-      <div class="split">
+      <div class="split" id="splitRow">
         <section class="panel" data-panel="effects">
           <div class="ph"><h2>Effects</h2><span class="meta"><span class="key">/</span> abilities</span></div>
           <div class="pb"><div class="list" id="effects"><div class="empty">No active effects</div></div></div>
@@ -298,6 +301,7 @@
   </div>
 </div>
 
+<button class="chipbtn" id="editDone" style="display:none;position:fixed;right:16px;bottom:16px;z-index:6;background:#1a1c1d;border-color:var(--gold);color:var(--gold)">Done editing layout</button>
 <div class="sheet" id="sheet">
   <section class="panel">
     <div class="ph"><h2 id="sheetTitle">Settings</h2><button class="chipbtn" id="sheetClose" style="margin-left:auto">Close</button></div>
@@ -390,6 +394,8 @@
     if (!colorMap[name]) { colorMap[name] = PALETTE[Object.keys(colorMap).length % PALETTE.length]; store.set("followerColors", colorMap); }
     return colorMap[name];
   }
+  const shapeMap = store.get("followerShapes", {});
+  const followerShape = (name) => shapeMap[name] || "dot";
   const deathSpots = new Map(); // name -> {x,y,ws}, until the next load
   function drawFollowers(ctx, toScreen, s, t) {
     for (const f of (s.followers || [])) {
@@ -406,7 +412,15 @@
       if (f.status === "Downed") {
         ctx.fillStyle = c; ctx.font = `700 ${Math.round(20 + 4 * Math.sin(t / 160))}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.lineWidth = 3; ctx.strokeStyle = "#000"; ctx.strokeText("!", x, y); ctx.fillText("!", x, y);
-      } else { ctx.fillStyle = c; ctx.strokeStyle = "#10140c"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      } else {
+        ctx.fillStyle = c; ctx.strokeStyle = "#10140c"; ctx.lineWidth = 2; ctx.beginPath();
+        const sh = followerShape(f.name), r = 5.5;
+        if (sh === "diamond") { ctx.moveTo(x, y - r * 1.3); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r * 1.3); ctx.lineTo(x - r, y); ctx.closePath(); }
+        else if (sh === "square") ctx.rect(x - r, y - r, r * 2, r * 2);
+        else if (sh === "triangle") { ctx.moveTo(x, y - r * 1.3); ctx.lineTo(x + r * 1.2, y + r); ctx.lineTo(x - r * 1.2, y + r); ctx.closePath(); }
+        else ctx.arc(x, y, r - .5, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+      }
       ctx.restore();
     }
   }
@@ -513,7 +527,7 @@
     renderPanels(s);
   }
   function onMarkers(m) { const first = !app.markers.length; app.markers = m.markers || []; if (first && app.markers.length && !app.follow) fitWorld(); }
-  function selectMap(edid) { const info = app.maps && app.maps[edid]; app.mapInfo = info || null; app.mapImg = info ? img(info.image) : null; }
+  function selectMap(edid) { const key = app.maps && Object.keys(app.maps).find(k => k.toLowerCase() === String(edid || "").toLowerCase()); const info = key ? app.maps[key] : null; app.mapInfo = info || null; app.mapImg = info ? img(info.image) : null; }
 
   // ---------- alerts (built from what the hub already sees; cleared on every load) ----------
   const events = [];
@@ -602,6 +616,13 @@
     }
     if (s && !s.where.interior) drawFollowers(ctx, W2S, s, t);
     if (s && app.shown && !s.where.interior) { const [x, y] = W2S(app.shown.x, app.shown.y); drawPlayer(ctx, x, y, app.shown.h, 13); }
+    // Quest marker: the tracked objective's target, like the game's quest arrow.
+    for (const q of (s && s.quests) || []) for (const tg of q.targets || []) {
+      if (tg.interior || tg.worldspaceId !== s.where.worldspaceId) continue;
+      const [x, y] = W2S(tg.x, tg.y), k = 6 + Math.sin(t / 300);
+      ctx.save(); ctx.fillStyle = "#d8b25a"; ctx.strokeStyle = "#1a140c"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, y - k * 1.6); ctx.lineTo(x + k, y); ctx.lineTo(x, y + k * 1.6); ctx.lineTo(x - k, y); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    }
     const pin = app.findPin;
     if (pin && Date.now() < pin.until && !pin.interior) {
       const [x, y] = W2S(pin.x, pin.y), k = (t / 700) % 1, c = followerColor(pin.name);
@@ -701,6 +722,13 @@
   const MONTHS = ["Morning Star", "Sun's Dawn", "First Seed", "Rain's Hand", "Second Seed", "Midyear", "Sun's Height", "Last Seed", "Hearthfire", "Frostfall", "Sun's Dusk", "Evening Star"];
   const MLEN = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   const DAYS = ["Sundas", "Morndas", "Tirdas", "Middas", "Turdas", "Fredas", "Loredas"];
+  // Holiday dates from the Holidays mod's own "Festivals of Skyrim" book (its MCM can move them).
+  const HOLIDAYS = { "Morning Star": { 1: "New Life Festival", 15: "South Wind's Prayer", 16: "Festival of Lights" }, "Sun's Dawn": { 13: "Feast of the Dead", 16: "Heart's Day" },
+    "First Seed": { 7: "First Planting" }, "Rain's Hand": { 28: "Jester's Day" }, "Second Seed": { 7: "Second Planting" }, "Midyear": { 16: "Mid Year Celebration" },
+    "Sun's Height": { 10: "Merchant's Festival", 20: "Sun's Rest" }, "Last Seed": { 27: "Harvest's End" }, "Hearthfire": { 3: "Tales and Tallows" }, "Frostfall": { 13: "Witches Festival" },
+    "Sun's Dusk": { 20: "Warriors Festival" }, "Evening Star": { 15: "North Wind's Prayer", 25: "Saturalia", 31: "Old Life Festival" } };
+  const SEASONS = ["", "Winter", "Spring", "Summer", "Autumn"];
+  const PHASES = ["Full", "Waning gibbous", "Last quarter", "Waning crescent", "New", "Waxing crescent", "First quarter", "Waxing gibbous"];
   let calKey = "";
   function renderHeaderAndCalendar(s) {
     const wh = s.where;
@@ -709,15 +737,22 @@
     if (!s.time) return;
     const tm = s.time;
     $("when").textContent = `${tm.dayName}, ${ordinal(tm.day)} of ${tm.month}, 4E ${tm.year} · ${gameTime(s)}`;
-    const key = tm.month + tm.day + tm.year; if (key === calKey) return; calKey = key;
+    const wo = s.world || {};
+    const key = tm.month + tm.day + tm.year + "|" + wo.season; if (key === calKey) return; calKey = key;
     const mi = MONTHS.indexOf(tm.month), len = mi >= 0 ? MLEN[mi] : 30, wd = DAYS.indexOf(tm.dayName);
     $("calMonth").textContent = tm.month; $("calYear").textContent = "4E " + tm.year;
     if (wd < 0) { $("cal").innerHTML = ""; return; }
     const first = ((wd - (tm.day - 1)) % 7 + 7) % 7;
     let html = "<table><tr>" + ["Su", "Mo", "Ti", "Mi", "Tu", "Fr", "Lo"].map(d => `<th>${d}</th>`).join("") + "</tr><tr>";
     for (let i = 0; i < first; i++) html += "<td></td>";
-    for (let d = 1; d <= len; d++) { const col = (first + d - 1) % 7; html += `<td class="${d === tm.day ? "today" : ""}">${d}</td>`; if (col === 6 && d < len) html += "</tr><tr>"; }
-    $("cal").innerHTML = html + "</tr></table>";
+    const hol = HOLIDAYS[tm.month] || {};
+    for (let d = 1; d <= len; d++) { const col = (first + d - 1) % 7; html += `<td class="${d === tm.day ? "today" : ""} ${hol[d] ? "hol" : ""}" title="${esc(hol[d] || "")}">${d}</td>`; if (col === 6 && d < len) html += "</tr><tr>"; }
+    const foot = [];
+    const upcoming = Object.entries(hol).filter(([d]) => +d >= tm.day).map(([d, n]) => `<span><span class="goldc">${d}</span> ${esc(n)}${+d === tm.day ? " (today)" : ""}</span>`);
+    foot.push(...upcoming);
+    if (wo.season > 0) foot.push(`<span>${SEASONS[wo.season]}</span>`);
+    if (wo.moonPhaseLength > 0 && wo.daysPassed >= 0) foot.push(`<span>Moons: ${PHASES[Math.floor(wo.daysPassed / wo.moonPhaseLength) % 8]}</span>`);
+    $("cal").innerHTML = html + `</tr></table><div class="calfoot">${foot.join("")}</div>`;
   }
 
   function renderParty(list) {
@@ -954,10 +989,15 @@
     el.style.display = "";
     const p = .8 * clamp(w.rating, 0, w.cap) / w.cap;
     $("protPct").textContent = Math.round(p * 100) + "%"; $("protPct").style.color = protColor(p);
-    const warming = w.uiLevel === 1;
-    $("protInfo").innerHTML = `Warmth ${Math.round(w.rating)} / ${Math.round(w.cap)}<br>${warming ? "Near fire, warming" : "No heat source"}`;
-    const t = performance.now(), h = warming ? 26 + Math.sin(t / 180) * 1.5 : 0, wd = 13;
-    $("flame").innerHTML = `<path d="M3 34 L27 30 M5 30 L25 34" stroke="#6b4a2a" stroke-width="2.5" stroke-linecap="round"/>` + (warming ?
+    // Campfire: full steady flame when warming, small flickering flame when you're in range but moving,
+    // small steady flame when you're in range and still but not warming (capped), unlit when no heat source.
+    const warming = w.uiLevel === 1, near = !!w.nearHeat || warming;
+    const state = warming ? "warming" : near && w.moving ? "moving" : near ? "capped" : "none";
+    const label = { warming: "Near fire, warming", moving: "Near fire, not warming while moving", capped: "Near fire, as warm as it gets here", none: "No heat source" }[state];
+    $("protInfo").innerHTML = `Warmth ${Math.round(w.rating)} / ${Math.round(w.cap)}<br>${label}`;
+    const t = performance.now(), wd = state === "warming" ? 13 : 8;
+    const h = state === "warming" ? 26 + Math.sin(t / 180) * 1.5 : state === "moving" ? 15 + Math.sin(t / 70) * 4 + Math.sin(t / 37) * 2 : state === "capped" ? 15 : 0;
+    $("flame").innerHTML = `<path d="M3 34 L27 30 M5 30 L25 34" stroke="#6b4a2a" stroke-width="2.5" stroke-linecap="round"/>` + (h > 0 ?
       `<path d="M15 ${32 - h} C ${15 + wd} ${32 - h * .55}, ${15 + wd * .8} 31, 15 31 C ${15 - wd * .8} 31, ${15 - wd} ${32 - h * .55}, 15 ${32 - h} Z" fill="#ef7a35"/>
        <path d="M15 ${32 - h * .55} C ${15 + wd * .45} ${32 - h * .3}, ${15 + wd * .4} 31, 15 31 C ${15 - wd * .4} 31, ${15 - wd * .45} ${32 - h * .3}, 15 ${32 - h * .55} Z" fill="#ffd27a"/>` : "");
   }
@@ -968,7 +1008,8 @@
     if (!qs || !qs.length) { el.innerHTML = ""; return; }
     const newest = qs[qs.length - 1], same = qs.filter(q => q.quest === newest.quest);
     const older = same.slice(0, -1).slice(-2).reverse();
-    el.innerHTML = `<b>${esc(newest.quest)}</b><span class="obj">${esc(cleanText(newest.text))}</span>` + older.map(q => `<span class="old">${esc(cleanText(q.text))}</span>`).join("");
+    const inside = (newest.targets || []).find(tg => tg.interior && tg.cell);
+    el.innerHTML = `<b>${esc(newest.quest)}</b><span class="obj">${esc(cleanText(newest.text))}</span>` + (inside ? `<span class="mute">in ${esc(inside.cell)}</span>` : "") + older.map(q => `<span class="old">${esc(cleanText(q.text))}</span>`).join("");
   }
 
   // ---------- crosshair details ----------
@@ -1003,7 +1044,12 @@
     } else if (c.kind === "ore") {
       kind = "Ore vein"; const o = c.ore || {};
       if (o.oreLeft === 0) add("Status", `<span class="red">Depleted</span>`);
-      else if (o.oreLeft < 0) add("Status", "Not started (amount rolls when you start)");
+      else if (o.oreLeft < 0) {
+        const r = o.range;
+        add("Status", "Not started");
+        if (r) { add("Ore", `<span class="num">${Math.round(r.oreMin)}${r.oreMax !== r.oreMin ? " to " + Math.round(r.oreMax) : ""}</span> <span class="mute">${esc(r.mode)}${r.skill ? " · Smithing " + Math.round(r.skill) : ""}</span>`);
+                 add("Swings each", `<span class="num">${Math.round(r.swingsMin)}${r.swingsMax !== r.swingsMin ? " to " + Math.round(r.swingsMax) : ""}</span>`); }
+      }
       else {
         add("Ore left", `<span class="num">${o.oreLeft * Math.max(1, o.orePerStrike)}</span>`);
         const sw = o.swingsLeft > 0 ? o.swingsLeft : o.swingsEach;
@@ -1242,7 +1288,30 @@
     for (const [k] of Object.entries(PANELS)) { const el = document.querySelector(`[data-panel="${k}"]`); if (el) el.style.display = layout.hidden.includes(k) ? "none" : ""; }
     const c = layout.cols; document.querySelector(".grid").style.gridTemplateColumns = window.innerWidth > 1100 ? `minmax(240px, ${c[0]}fr) minmax(0, ${c[1]}fr) minmax(280px, ${c[2]}fr)` : "";
   }
-  applyLayout(); window.addEventListener("resize", applyLayout);
+  const CONTAINERS = ["colL", "colC", "lowRow", "colR", "splitRow"];
+  function saveOrder() { layout.order = {}; for (const id of CONTAINERS) layout.order[id] = [...$(id).children].map(c => c.dataset.panel || c.id).filter(Boolean); store.set("layout", layout); }
+  function applyOrder() {
+    if (!layout.order) return;
+    for (const id of CONTAINERS) for (const key of layout.order[id] || []) { const el = document.querySelector(`[data-panel="${key}"]`) || $(key); if (el && el !== $(id) && !el.contains($(id))) $(id).appendChild(el); }
+  }
+  applyOrder(); applyLayout(); window.addEventListener("resize", applyLayout);
+  // Edit mode: drag a panel onto another panel to put it there; drop on an empty part of a column to add it at the end.
+  let dragged = null;
+  function setEdit(on) {
+    document.body.classList.toggle("edit", on); $("editDone").style.display = on ? "" : "none";
+    for (const el of document.querySelectorAll("[data-panel]")) el.draggable = on;
+  }
+  $("editDone").onclick = () => { setEdit(false); saveOrder(); };
+  document.addEventListener("dragstart", (e) => { if (!document.body.classList.contains("edit")) return; dragged = e.target.closest("[data-panel]"); });
+  document.addEventListener("dragover", (e) => { if (!dragged) return; e.preventDefault(); for (const x of document.querySelectorAll(".dragover")) x.classList.remove("dragover"); const tgt = e.target.closest("[data-panel]"); if (tgt && tgt !== dragged) tgt.classList.add("dragover"); });
+  document.addEventListener("drop", (e) => {
+    if (!dragged) return; e.preventDefault();
+    for (const x of document.querySelectorAll(".dragover")) x.classList.remove("dragover");
+    const tgt = e.target.closest("[data-panel]"), box = e.target.closest(CONTAINERS.map(c => "#" + c).join(","));
+    if (tgt && tgt !== dragged && !dragged.contains(tgt)) tgt.parentNode.insertBefore(dragged, tgt);
+    else if (box && !dragged.contains(box)) box.appendChild(dragged);
+    dragged = null; saveOrder(); applyLayout();
+  });
 
   // ---------- settings ----------
   async function openSettings() {
@@ -1262,12 +1331,14 @@
       <div style="margin-top:4px"><span class="dim">Bestiary weaknesses from:</span> ${["vanilla", "r&w", "kye2", "req"].map(c => `<label><input type="radio" name="bc" value="${c}" ${bestiaryCol === c ? "checked" : ""}> ${c === "vanilla" ? "Vanilla" : c === "r&w" ? "Resistances & Weaknesses" : c === "kye2" ? "KYE" : "Requiem"}</label>`).join("")}</div>`;
     html += `<div class="grp" style="margin-top:12px">Party</div>
       <div class="dim" style="font-size:13px">Vanilla follower ${sl.followers >= 0 ? Math.round(sl.followers) : "?"} / 1 · Animal ${sl.animals >= 0 ? Math.round(sl.animals) : "?"} / 1 · Tamed ${sl.tamed1 >= 0 ? (sl.tamed1 > 0) + (sl.tamed2 > 0) : "?"} / ${1 + Math.max(0, sl.packLeader || 0)} · Interesting NPCs and modded followers use their own systems</div>
-      <div id="colorPick">${names.map(n => `<label>${esc(n)} <input type="color" data-name="${esc(n)}" value="${followerColor(n)}"></label>`).join("") || '<span class="mute">No followers yet</span>'}</div>`;
+      <div id="colorPick">${names.map(n => `<label>${esc(n)} <input type="color" data-name="${esc(n)}" value="${followerColor(n)}">
+        <select data-shape="${esc(n)}">${["dot", "diamond", "square", "triangle"].map(sh => `<option ${followerShape(n) === sh ? "selected" : ""}>${sh}</option>`).join("")}</select></label>`).join("") || '<span class="mute">No followers yet</span>'}</div>`;
     html += `<div class="grp" style="margin-top:12px">Local map</div>
       <label>Background <input type="range" id="lmAlpha" min="0.2" max="1" step="0.05" value="${localAlpha}"></label>
       <label><input type="checkbox" id="lmCont" ${app.settings.localContainers !== false ? "checked" : ""}> Show containers</label>`;
     html += `<div class="grp" style="margin-top:12px">Panels</div><div id="panelPick">` +
       Object.entries(PANELS).map(([k, n]) => `<label><input type="checkbox" value="${k}" ${layout.hidden.includes(k) ? "" : "checked"}> ${n}</label>`).join("") + `</div>
+      <div style="margin-top:4px"><button class="chipbtn" id="editLayout">Edit layout (drag panels)</button> <button class="chipbtn" id="resetLayout">Reset layout</button></div>
       <div style="margin-top:4px"><span class="dim">Column widths</span> ${[0, 1, 2].map(i => `<input type="range" class="colw" data-i="${i}" min="10" max="70" step="2" value="${layout.cols[i]}">`).join(" ")}</div>`;
     html += `<div class="grp" style="margin-top:12px">Log folder</div>
       <input type="text" id="logFolder" placeholder="C:\\Users\\You\\Documents\\Skyrim Companion"> <button class="chipbtn" id="logSave">Save</button> <span class="mute" id="logMsg"></span>`;
@@ -1277,6 +1348,9 @@
     for (const r of document.getElementsByName("fm")) r.onchange = () => { focusMode = r.value; store.set("focusMode", focusMode); };
     for (const r of document.getElementsByName("bc")) r.onchange = () => { bestiaryCol = r.value; store.set("bestiaryCol", bestiaryCol); };
     for (const c of $("colorPick").querySelectorAll("input[type=color]")) c.oninput = () => { colorMap[c.dataset.name] = c.value; store.set("followerColors", colorMap); };
+    for (const c of $("colorPick").querySelectorAll("select[data-shape]")) c.onchange = () => { shapeMap[c.dataset.shape] = c.value; store.set("followerShapes", shapeMap); };
+    $("editLayout").onclick = () => { closeSheet(); setEdit(true); };
+    $("resetLayout").onclick = () => { store.set("layout", {}); location.reload(); };
     $("lmAlpha").oninput = () => { localAlpha = +$("lmAlpha").value; store.set("localAlpha", localAlpha); };
     $("lmCont").onchange = () => { app.settings.localContainers = $("lmCont").checked; store.set("settings", app.settings); };
     $("panelPick").onchange = () => { layout.hidden = [...$("panelPick").querySelectorAll("input")].filter(i => !i.checked).map(i => i.value); store.set("layout", layout); applyLayout(); };

@@ -115,6 +115,100 @@ namespace companion::extras
 			};
 	}
 
+	// Before you start a vein, Random Mining hasn't rolled yet. Work out the possible range from its MCM
+	// settings and your Smithing, the same way its MineOreScript does (pickaxe = Smithing).
+	json OreRange(const json& a_vein, RE::PlayerCharacter* a_player)
+	{
+		const auto dh = RE::TESDataHandler::GetSingleton();
+		const auto quest = dh ? dh->LookupForm<RE::TESQuest>(0xD62, "Random Mining MCM.esp") : nullptr;
+		const auto vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+		if (!quest || !vm) {
+			return nullptr;
+		}
+		const auto policy = vm->GetObjectHandlePolicy();
+		const auto handle = policy ? policy->GetHandleForObject(quest->GetFormType(), quest) : 0;
+		RE::BSTSmartPointer<RE::BSScript::Object> mcm;
+		if (!handle || !vm->FindBoundObject(handle, "abim_RM_MCM_QuestScript", mcm) || !mcm) {
+			return nullptr;
+		}
+		auto num = [&](const char* a_name) -> float {
+			const auto v = mcm->GetProperty(a_name);
+			if (!v) {
+				return -1.0f;
+			}
+			if (v->IsInt()) {
+				return static_cast<float>(v->GetSInt());
+			}
+			return v->IsFloat() ? v->GetFloat() : -1.0f;
+		};
+		auto flag = [&](const char* a_name) {
+			const auto v = mcm->GetProperty(a_name);
+			return v && v->IsBool() && v->GetBool();
+		};
+		const int perStrike = (std::max)(1, a_vein.value("orePerStrike", 1));
+		if (a_vein.value("oreTotal", 3) != 3) {
+			return json{ { "mode", "fixed" }, { "oreMin", a_vein.value("oreTotal", 0) * perStrike }, { "oreMax", a_vein.value("oreTotal", 0) * perStrike },
+				{ "swingsMin", a_vein.value("swingsEach", 0) }, { "swingsMax", a_vein.value("swingsEach", 0) } };
+		}
+		if (flag("DoHardWorker")) {
+			const float skill = a_player->AsActorValueOwner()->GetActorValue(RE::ActorValue::kSmithing);
+			int tier = 5;
+			for (int i = 1; i <= 4; ++i) {
+				if (skill <= num(std::format("LR{}MAXL", i).c_str())) {
+					tier = i;
+					break;
+				}
+			}
+			return json{ { "mode", "Hard Worker" }, { "skill", skill },
+				{ "oreMin", num(std::format("LR{}MinO", tier).c_str()) * perStrike }, { "oreMax", num(std::format("LR{}MaxO", tier).c_str()) * perStrike },
+				{ "swingsMin", num(std::format("LR{}StrikesMin", tier).c_str()) }, { "swingsMax", num(std::format("LR{}StrikesMax", tier).c_str()) } };
+		}
+		return json{ { "mode", flag("DoLazyman") ? "Lazy Man" : "Default" }, { "oreMin", num("DLMinValue") * perStrike }, { "oreMax", num("DLMaxValue") * perStrike },
+			{ "swingsMin", a_vein.value("swingsEach", 0) }, { "swingsMax", a_vein.value("swingsEach", 0) } };
+	}
+
+	// ----- calendar extras: Seasons of Skyrim season and moon phase timing -----
+	namespace
+	{
+		std::atomic<int> g_season{ -1 };
+
+		class SeasonCallback : public RE::BSScript::IStackCallbackFunctor
+		{
+		public:
+			void operator()(RE::BSScript::Variable a_result) override
+			{
+				if (a_result.IsInt()) {
+					g_season = a_result.GetSInt();
+				}
+			}
+			void SetObject(const RE::BSTSmartPointer<RE::BSScript::Object>&) override {}
+		};
+	}
+
+	void RequestSeason()
+	{
+		// Seasons of Skyrim exposes its season through a Papyrus function; ask the script engine for it.
+		const auto vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+		if (!vm) {
+			return;
+		}
+		RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> callback(new SeasonCallback());
+		const auto args = RE::MakeFunctionArguments();
+		vm->DispatchStaticCall("SeasonsOfSkyrim", "GetCurrentSeason", args, callback);
+	}
+
+	json World()
+	{
+		json out{ { "season", g_season.load() } };
+		if (const auto sky = RE::Sky::GetSingleton(); sky && sky->currentClimate) {
+			out["moonPhaseLength"] = sky->currentClimate->timing.GetPhaseLength();
+		}
+		if (const auto cal = RE::Calendar::GetSingleton(); cal) {
+			out["daysPassed"] = cal->GetDaysPassed();
+		}
+		return out;
+	}
+
 	json Progress(RE::PlayerCharacter* a_player)
 	{
 		const auto skills = a_player->GetInfoRuntimeData().skills;
@@ -136,9 +230,41 @@ namespace companion::extras
 		return json{ { "xp", data->xp }, { "threshold", data->levelThreshold }, { "skills", list } };
 	}
 
+	// Same check Survival Mode Improved uses: a heat source from its list within 580 units.
+	// (SMI also requires you not to be running, sprinting or swimming before it warms you.)
+	bool NearHeatSource(RE::PlayerCharacter* a_player)
+	{
+		static RE::BGSListForm* list = nullptr;
+		static bool looked = false;
+		if (!looked) {
+			looked = true;
+			if (const auto dh = RE::TESDataHandler::GetSingleton(); dh) {
+				list = dh->LookupForm<RE::BGSListForm>(0x8AA, "ccqdrsse001-survivalmode.esl");
+			}
+		}
+		const auto tes = RE::TES::GetSingleton();
+		if (!list || !tes) {
+			return false;
+		}
+		bool near = false;
+		tes->ForEachReferenceInRange(a_player, 580.0f, [&](RE::TESObjectREFR* a_ref) {
+			if (a_ref && !a_ref->IsDisabled() && a_ref->Is3DLoaded()) {
+				if (const auto base = a_ref->GetBaseObject(); base && list->HasForm(base)) {
+					near = true;
+					return RE::BSContainer::ForEachResult::kStop;
+				}
+			}
+			return RE::BSContainer::ForEachResult::kContinue;
+		});
+		return near;
+	}
+
 	json Warmth(RE::PlayerCharacter* a_player)
 	{
+		const auto state = a_player->AsActorState();
 		return json{
+			{ "nearHeat", NearHeatSource(a_player) },
+			{ "moving", a_player->IsRunning() || (state && (state->IsSprinting() || state->IsSwimming())) },
 			{ "rating", GetWarmthRating(a_player) },
 			{ "cap", GlobalValue("Survival_ColdResistMaxValue", 0.0f) },
 			// Survival Mode Improved's UI state: 0 neutral, 1 near heat (warming), 2 warm, 3 cold, 4 freezing.
@@ -234,7 +360,28 @@ namespace companion::extras
 			if (!quest->IsActive()) {
 				continue;
 			}
-			list.push_back({ { "quest", Str(quest->GetFullName()) }, { "text", Str(obj->displayText.c_str()) }, { "index", obj->index } });
+			json j{ { "quest", Str(quest->GetFullName()) }, { "text", Str(obj->displayText.c_str()) }, { "index", obj->index } };
+			// Where the objective points, like the game's quest marker.
+			json targets = json::array();
+			for (std::uint32_t i = 0; i < obj->numTargets && obj->targets && i < 4; ++i) {
+				const auto target = obj->targets[i];
+				if (!target) {
+					continue;
+				}
+				RE::ObjectRefHandle handle;
+				target->GetTargetRef(handle, true, quest);
+				const auto ref = handle.get();
+				if (!ref) {
+					continue;
+				}
+				const auto pos = ref->GetPosition();
+				const auto cell = ref->GetParentCell();
+				const auto ws = ref->GetWorldspace();
+				targets.push_back({ { "x", pos.x }, { "y", pos.y }, { "worldspaceId", ws ? ws->GetFormID() : 0 },
+					{ "interior", cell && cell->IsInteriorCell() }, { "cell", cell ? Str(cell->GetName()) : "" } });
+			}
+			j["targets"] = targets;
+			list.push_back(std::move(j));
 		}
 		return list;
 	}
@@ -387,6 +534,9 @@ namespace companion::extras
 					return nullptr;  // other activators aren't interesting
 				}
 				j["kind"] = "ore";
+				if (ore.value("oreLeft", -1) < 0) {
+					ore["range"] = OreRange(ore, a_player);
+				}
 				j["ore"] = ore;
 				break;
 			}
