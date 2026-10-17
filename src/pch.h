@@ -10,6 +10,12 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <functional>
+#include <future>
+#include <optional>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <fstream>
 #include <map>
 #include <mutex>

@@ -1,4 +1,5 @@
 #include "Feed.h"
+#include "State.h"
 
 namespace companion::feed
 {
@@ -42,6 +43,55 @@ namespace companion::feed
 			return i >= 0 && i < 18 ? kNames[i] : nullptr;
 		}
 
+		// New gear alert: only when the base value beats what's equipped in the same slot and class
+		// (or the same weapon type). Clothing and jewelry are skipped.
+		void CheckUpgrade(RE::TESForm* a_form)
+		{
+			const auto player = RE::PlayerCharacter::GetSingleton();
+			if (!player || !a_form) {
+				return;
+			}
+			if (const auto weap = a_form->As<RE::TESObjectWEAP>(); weap) {
+				const auto eq = player->GetEquippedObject(false);
+				const auto mine = eq ? eq->As<RE::TESObjectWEAP>() : nullptr;
+				if (mine && mine != weap && mine->GetWeaponType() == weap->GetWeaponType() && weap->GetAttackDamage() > mine->GetAttackDamage()) {
+					Push(std::format("Upgrade: {} ({} damage vs {} on {})", Name(weap), static_cast<int>(weap->GetAttackDamage()), static_cast<int>(mine->GetAttackDamage()), Name(mine)), "upgrade");
+				}
+				return;
+			}
+			if (const auto armo = a_form->As<RE::TESObjectARMO>(); armo) {
+				if (!armo->IsHeavyArmor() && !armo->IsLightArmor()) {
+					return;
+				}
+				using Slot = RE::BGSBipedObjectForm::BipedObjectSlot;
+				for (const auto slot : { Slot::kBody, Slot::kHead, Slot::kHands, Slot::kFeet, Slot::kShield }) {
+					if (!armo->GetSlotMask().all(slot)) {
+						continue;
+					}
+					const auto worn = player->GetWornArmor(slot);
+					if (worn && worn != armo && worn->IsHeavyArmor() == armo->IsHeavyArmor() && worn->IsLightArmor() == armo->IsLightArmor() &&
+						armo->GetArmorRating() > worn->GetArmorRating()) {
+						Push(std::format("Upgrade: {} ({} armor vs {} on {})", Name(armo), static_cast<int>(armo->GetArmorRating()), static_cast<int>(worn->GetArmorRating()), Name(worn)), "upgrade");
+					}
+					return;
+				}
+			}
+		}
+
+		// Map screen opened: the hub loads map markers then (not at game load).
+		class MenuSink : public RE::BSTEventSink<RE::MenuOpenCloseEvent>
+		{
+		public:
+			static MenuSink* Get() { static MenuSink s; return &s; }
+			RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override
+			{
+				if (a_event && a_event->opening && a_event->menuName == RE::MapMenu::MENU_NAME) {
+					state::OnMapOpened();
+				}
+				return RE::BSEventNotifyControl::kContinue;
+			}
+		};
+
 		// Items moving into the player's inventory.
 		class ContainerSink : public RE::BSTEventSink<RE::TESContainerChangedEvent>
 		{
@@ -52,9 +102,11 @@ namespace companion::feed
 				try {
 					constexpr RE::FormID kPlayer = 0x14;
 					if (a_event && a_event->newContainer == kPlayer && a_event->oldContainer != kPlayer && a_event->itemCount > 0) {
-						const auto name = Name(RE::TESForm::LookupByID(a_event->baseObj));
+						const auto form = RE::TESForm::LookupByID(a_event->baseObj);
+						const auto name = Name(form);
 						if (!name.empty()) {
 							Push(a_event->itemCount > 1 ? std::format("Picked up {} ({})", name, a_event->itemCount) : "Picked up " + name, "pickup");
+							CheckUpgrade(form);
 						}
 					}
 				} catch (...) {
@@ -150,6 +202,9 @@ namespace companion::feed
 		Add(RE::LevelIncrease::GetEventSource(), LevelSink::Get(), "level increase");
 		Add(RE::LocationDiscovery::GetEventSource(), DiscoverySink::Get(), "location discovery");
 		Add(SKSE::GetCrosshairRefEventSource(), CrosshairSink::Get(), "crosshair");
+		if (const auto ui = RE::UI::GetSingleton(); ui) {
+			ui->AddEventSink<RE::MenuOpenCloseEvent>(MenuSink::Get());
+		}
 		logs::info("Event feed ready");
 	}
 

@@ -2,6 +2,11 @@
 #include "State.h"
 #include "Hotkeys.h"
 #include "Feed.h"
+#include "GameThread.h"
+#include "Readouts.h"
+#include "Extras.h"
+#include "LocalMap.h"
+#include "Log.h"
 
 namespace
 {
@@ -91,6 +96,64 @@ namespace
 		}
 		if (a_path == "/api/mapmarker-configs") {
 			return { 200, "application/json", MapMarkerConfigs() };
+		}
+		// On-demand lookups: these run on the game thread only when the page asks.
+		auto onGame = [](std::function<std::string()> a_job) -> companion::server::Response {
+			if (const auto text = companion::gamethread::Run(std::move(a_job)); text) {
+				return { 200, "application/json", *text };
+			}
+			return { 503, "application/json", R"({"error":"game busy"})" };
+		};
+		auto hexTail = [&](std::string_view a_prefix) -> std::optional<RE::FormID> {
+			if (!a_path.starts_with(a_prefix)) {
+				return std::nullopt;
+			}
+			try {
+				return static_cast<RE::FormID>(std::stoul(a_path.substr(a_prefix.size()), nullptr, 16));
+			} catch (...) {
+				return std::nullopt;
+			}
+		};
+		if (a_path.starts_with("/api/localmap/")) {
+			std::uint32_t have = 0;
+			try {
+				have = static_cast<std::uint32_t>(std::stoul(a_path.substr(14)));
+			} catch (...) {
+			}
+			return onGame([have] { return companion::localmap::Get(have); });
+		}
+		if (const auto id = hexTail("/api/follower/"); id) {
+			return onGame([id] { return companion::readouts::FollowerDetails(*id); });
+		}
+		if (const auto id = hexTail("/api/find/"); id) {
+			return onGame([id] { return companion::readouts::FindActor(*id); });
+		}
+		if (const auto id = hexTail("/api/book/"); id) {
+			return onGame([id] { return companion::extras::BookText(*id); });
+		}
+		if (a_path == "/api/log") {
+			return { 200, "text/plain; charset=utf-8", companion::textlog::Read() };
+		}
+		if (a_path == "/api/logfolder") {
+			return { 200, "application/json", json{ { "folder", companion::textlog::Folder() } }.dump() };
+		}
+		if (a_path.starts_with("/api/setlogfolder/")) {
+			std::string error;
+			const bool ok = companion::textlog::SetFolder(a_path.substr(18), error);
+			return { 200, "application/json", json{ { "ok", ok }, { "error", error }, { "folder", companion::textlog::Folder() } }.dump() };
+		}
+		if (a_path == "/api/hotkeys") {
+			// Hotkey Reminder's key list, if installed (read-only).
+			const auto data = g_webRoot.parent_path().parent_path().parent_path() / "Interface";
+			for (const auto* file : { "hotkeysreminder_data.json", "hotkeysreminder_default.json" }) {
+				std::ifstream in(data / file, std::ios::binary);
+				if (in) {
+					std::ostringstream ss;
+					ss << in.rdbuf();
+					return { 200, "application/json", ss.str() };
+				}
+			}
+			return { 404, "application/json", "{}" };
 		}
 		if (a_path == "/api/ping") {
 			return { 200, "application/json", R"({"ok":true,"app":"SkyrimCompanion"})" };

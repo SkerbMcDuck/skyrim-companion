@@ -1,4 +1,5 @@
 #include "Readouts.h"
+#include "Log.h"
 
 namespace companion::readouts
 {
@@ -166,6 +167,14 @@ namespace companion::readouts
 					if (const auto charge = entry->GetEnchantmentCharge(); charge) {
 						j["charge"] = *charge;
 					}
+					if (entry->extraLists) {
+						for (const auto xList : *entry->extraLists) {
+							const auto poison = xList ? xList->GetByType<RE::ExtraPoison>() : nullptr;
+							if (poison && poison->poison && poison->count > 0) {
+								j["poison"] = { { "name", Str(poison->poison->GetFullName()) }, { "doses", poison->count } };
+							}
+						}
+					}
 				}
 			} else if (const auto spell = form->As<RE::SpellItem>(); spell) {
 				j["kind"] = "spell";
@@ -265,31 +274,138 @@ namespace companion::readouts
 				continue;
 			}
 			const char* kind = alch->IsPoison() ? "poison" : alch->IsFood() ? "food" : "potion";
+			// Stress and Fear marks stress relievers with Stress_ReduceN keywords.
+			int stress = 0;
+			for (std::uint32_t k = 0; k < alch->numKeywords; ++k) {
+				const auto kw = alch->keywords[k];
+				const std::string id = kw ? Str(kw->GetFormEditorID()) : std::string();
+				if (id.starts_with("Stress_Reduce")) {
+					try {
+						stress = (std::max)(stress, std::stoi(id.substr(13)));
+					} catch (...) {
+					}
+				}
+			}
 			list.push_back({
 				{ "name", data.second ? Str(data.second->GetDisplayName()) : Str(alch->GetFullName()) },
 				{ "count", count },
 				{ "kind", kind },
+				{ "stress", stress },
 				{ "effects", EffectSummary(alch) }
 			});
 		}
 		return list;
 	}
 
-	// Followers: any loaded actor flagged as the player's teammate. Once seen, a follower is
-	// remembered so we can still report where they are after they're left behind or unloaded.
+	// Followers: anyone flagged as the player's teammate, plus whoever fills the vanilla follower and animal
+	// slots (so a follower left far away still shows). Remembered until the next load.
 	namespace
 	{
-		std::vector<RE::FormID> g_knownFollowers;
+		std::vector<RE::FormID>                 g_knownFollowers;
+		std::unordered_map<RE::FormID, bool>    g_wasDead;
+		std::unordered_set<RE::FormID>          g_inService;
+		std::chrono::steady_clock::time_point   g_settleUntil{};
+
+		float Global(const char* a_editorID, float a_fallback)
+		{
+			const auto g = RE::TESForm::LookupByEditorID<RE::TESGlobal>(a_editorID);
+			return g ? g->value : a_fallback;
+		}
+
+		std::string WhereIs(RE::Actor* a_actor)
+		{
+			const auto cell = a_actor->GetParentCell();
+			const auto loc = a_actor->GetCurrentLocation();
+			if (cell && cell->IsInteriorCell()) {
+				return Str(cell->GetName());
+			}
+			if (loc) {
+				return Str(loc->GetName());
+			}
+			const auto ws = a_actor->GetWorldspace();
+			return ws ? Str(ws->GetName()) : std::string();
+		}
+
+		void AddVanillaSlots(std::vector<RE::FormID>& a_known)
+		{
+			// DialogueFollower (Skyrim.esm 0x000750BA) holds the vanilla follower and animal aliases.
+			const auto quest = RE::TESForm::LookupByID<RE::TESQuest>(0x000750BA);
+			if (!quest) {
+				return;
+			}
+			RE::BSReadLockGuard guard{ quest->aliasAccessLock };
+			for (const auto& [aliasID, handle] : quest->refAliasMap) {
+				const auto ref = handle.get();
+				const auto actor = ref ? ref->As<RE::Actor>() : nullptr;
+				if (actor && std::find(a_known.begin(), a_known.end(), actor->GetFormID()) == a_known.end()) {
+					a_known.push_back(actor->GetFormID());
+				}
+			}
+		}
+
+		bool IsCreature(RE::Actor* a_actor)
+		{
+			const auto race = a_actor->GetRace();
+			return race && !race->HasKeywordString("ActorTypeNPC");
+		}
+
+		json HandName(RE::Actor* a_actor, bool a_left)
+		{
+			const auto form = a_actor->GetEquippedObject(a_left);
+			return form ? json(Str(form->GetName())) : json(nullptr);
+		}
+
+		json CombatSpells(RE::Actor* a_actor, std::size_t a_max)
+		{
+			json list = json::array();
+			auto add = [&](RE::SpellItem* a_spell) {
+				if (!a_spell || list.size() >= a_max || a_spell->GetSpellType() != RE::MagicSystem::SpellType::kSpell) {
+					return;
+				}
+				const auto name = Str(a_spell->GetFullName());
+				if (!name.empty() && std::find(list.begin(), list.end(), name) == list.end()) {
+					list.push_back(name);
+				}
+			};
+			for (const auto spell : a_actor->GetActorRuntimeData().addedSpells) {
+				add(spell);
+			}
+			if (const auto base = a_actor->GetActorBase(); base && base->actorEffects) {
+				const auto spells = base->actorEffects;
+				for (std::uint32_t i = 0; i < spells->numSpells; ++i) {
+					add(spells->spells[i]);
+				}
+			}
+			return list;
+		}
 	}
 
 	void ResetFollowers()
 	{
 		g_knownFollowers.clear();
+		g_wasDead.clear();
+		g_inService.clear();
+		// Followers found right after a load were already with you; don't log them as hires.
+		g_settleUntil = std::chrono::steady_clock::now() + std::chrono::seconds(6);
+	}
+
+	json PartySlots()
+	{
+		return json{
+			{ "followers", Global("PlayerFollowerCount", -1.0f) },
+			{ "animals", Global("PlayerAnimalCount", -1.0f) },
+			{ "tamed1", Global("_AAA_AnimalSlot1Taken", -1.0f) },
+			{ "tamed2", Global("_AAA_AnimalSlot2Taken", -1.0f) },
+			{ "packLeader", Global("_AAA_PerkRank_PackLeader", -1.0f) },
+			{ "pet1Hunger", Global("_AAA_Pet1_Hunger", -1.0f) },
+			{ "pet2Hunger", Global("_AAA_Pet2_Hunger", -1.0f) }
+		};
 	}
 
 	json Followers(RE::PlayerCharacter* a_player)
 	{
 		auto& known = g_knownFollowers;
+		const bool settled = std::chrono::steady_clock::now() > g_settleUntil;
 
 		if (const auto lists = RE::ProcessLists::GetSingleton(); lists) {
 			for (const auto& handle : lists->highActorHandles) {
@@ -299,6 +415,7 @@ namespace companion::readouts
 				}
 			}
 		}
+		AddVanillaSlots(known);
 
 		json list = json::array();
 		const auto playerPos = a_player->GetPosition();
@@ -312,13 +429,33 @@ namespace companion::readouts
 				continue;
 			}
 			const bool dead = actor->IsDead(false);
-			// Dismissed followers drop off; dead ones stay listed (until the next load) so you notice.
-			if (!actor->IsPlayerTeammate() && !dead) {
-				continue;
+			const auto owner = actor->AsActorValueOwner();
+			const bool waiting = owner->GetActorValue(RE::ActorValue::kWaitingForPlayer) > 0.0f;
+			const bool teammate = actor->IsPlayerTeammate();
+			const bool inService = teammate || (waiting && g_inService.contains(id));
+			const std::string name = Str(actor->GetName());
+
+			// Log hires, dismissals and deaths.
+			if (inService && !g_inService.contains(id)) {
+				g_inService.insert(id);
+				if (settled) {
+					textlog::Write(std::format("{} | Hired: {} | {}", textlog::GameDate(), name, WhereIs(actor)));
+				}
+			}
+			if (dead && !g_wasDead[id]) {
+				g_wasDead[id] = true;
+				if (settled && g_inService.contains(id)) {
+					textlog::Write(std::format("{} | Died: {} | {}", textlog::GameDate(), name, WhereIs(actor)));
+				}
+			}
+			if (!inService && !dead) {
+				if (g_inService.erase(id) && settled) {
+					textlog::Write(std::format("{} | Dismissed: {} | {}", textlog::GameDate(), name, WhereIs(actor)));
+				}
+				continue;  // dismissed followers drop off the list
 			}
 			keep.push_back(id);
 
-			const auto owner = actor->AsActorValueOwner();
 			auto av = [&](RE::ActorValue a) {
 				const float cur = owner->GetActorValue(a);
 				const float max = owner->GetPermanentActorValue(a) + actor->GetActorValueModifier(RE::ACTOR_VALUE_MODIFIER::kTemporary, a);
@@ -332,25 +469,29 @@ namespace companion::readouts
 			const bool sameSpace = cell && playerCell && (cell == playerCell || (ws && ws == playerWs));
 			const auto state = actor->AsActorState();
 
-			std::string status = "Following";
+			std::string status = waiting ? "Waiting" : "Following";
 			if (dead) {
 				status = "Dead";
 			} else if (state && state->IsBleedingOut()) {
 				status = "Downed";
 			} else if (actor->IsInCombat()) {
 				status = "In combat";
-			} else if (!sameSpace) {
+			} else if (!sameSpace && !waiting) {
 				status = "Away";
 			}
 
-			list.push_back({
-				{ "name", Str(actor->GetName()) },
+			json j{
+				{ "id", id },
+				{ "name", name },
 				{ "level", actor->GetLevel() },
 				{ "health", av(RE::ActorValue::kHealth) },
 				{ "magicka", av(RE::ActorValue::kMagicka) },
 				{ "stamina", av(RE::ActorValue::kStamina) },
 				{ "status", status },
 				{ "dead", dead },
+				{ "waiting", waiting },
+				{ "essential", actor->IsEssential() || actor->IsProtected() },
+				{ "creature", IsCreature(actor) },
 				{ "loaded", actor->Is3DLoaded() },
 				{ "mounted", actor->IsOnMount() },
 				{ "sameSpace", sameSpace },
@@ -361,9 +502,62 @@ namespace companion::readouts
 				{ "interior", cell ? cell->IsInteriorCell() : false },
 				{ "cell", cell ? Str(cell->GetName()) : "" },
 				{ "location", loc ? Str(loc->GetName()) : "" }
-			});
+			};
+			if (actor->Is3DLoaded() && !dead) {
+				json battle{ { "armor", owner->GetActorValue(RE::ActorValue::kDamageResist) }, { "right", HandName(actor, false) }, { "left", HandName(actor, true) },
+					{ "carry", { { "cur", owner->GetActorValue(RE::ActorValue::kInventoryWeight) }, { "max", owner->GetActorValue(RE::ActorValue::kCarryWeight) } } },
+					{ "spells", CombatSpells(actor, 3) } };
+				if (const auto ammo = actor->GetCurrentAmmo(); ammo) {
+					const auto counts = actor->GetInventoryCounts([](RE::TESBoundObject& a_obj) { return a_obj.Is(RE::FormType::Ammo); });
+					const auto it = counts.find(ammo);
+					battle["ammo"] = { { "name", Str(ammo->GetName()) }, { "count", it != counts.end() ? it->second : 0 } };
+				}
+				j["battle"] = battle;
+			}
+			list.push_back(std::move(j));
 		}
 		known = keep;
 		return list;
+	}
+
+	std::string FollowerDetails(RE::FormID a_id)
+	{
+		const auto actor = RE::TESForm::LookupByID<RE::Actor>(a_id);
+		if (!actor) {
+			return R"({"error":"not found"})";
+		}
+		json items = json::array();
+		const auto inv = actor->GetInventory();
+		for (const auto& [obj, data] : inv) {
+			if (data.first <= 0 || !obj) {
+				continue;
+			}
+			const auto entry = data.second.get();
+			items.push_back({ { "name", entry ? Str(entry->GetDisplayName()) : Str(obj->GetName()) },
+				{ "count", data.first },
+				{ "type", static_cast<int>(obj->GetFormType()) },
+				{ "worn", entry && entry->IsWorn() },
+				{ "weight", obj->GetWeight() },
+				{ "value", obj->GetGoldValue() } });
+		}
+		json out{ { "id", a_id }, { "name", Str(actor->GetName()) }, { "items", items }, { "spells", CombatSpells(actor, 40) },
+			{ "where", WhereIs(actor) }, { "right", HandName(actor, false) }, { "left", HandName(actor, true) } };
+		return out.dump(-1, ' ', false, json::error_handler_t::replace);
+	}
+
+	std::string FindActor(RE::FormID a_id)
+	{
+		const auto actor = RE::TESForm::LookupByID<RE::Actor>(a_id);
+		if (!actor) {
+			return R"({"error":"not found"})";
+		}
+		const auto pos = actor->GetPosition();
+		const auto ws = actor->GetWorldspace();
+		const auto cell = actor->GetParentCell();
+		json out{ { "id", a_id }, { "name", Str(actor->GetName()) }, { "where", WhereIs(actor) }, { "x", pos.x }, { "y", pos.y },
+			{ "interior", cell ? cell->IsInteriorCell() : false }, { "worldspaceId", ws ? ws->GetFormID() : 0 },
+			{ "dead", actor->IsDead(false) } };
+		// Inside an interior, point the map at the door that leads outside if the game knows it.
+		return out.dump(-1, ' ', false, json::error_handler_t::replace);
 	}
 }

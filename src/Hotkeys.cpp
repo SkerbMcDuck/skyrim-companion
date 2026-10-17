@@ -16,6 +16,7 @@ namespace companion::hotkeys
 			{ 0x37, "cycleView" },           // NumPad *
 			{ 0x53, "toggleUndiscovered" },  // NumPad .
 			{ 0xB5, "toggleAbilities" },     // NumPad /
+			{ 0x52, "selectNext" },          // NumPad 0: step through active effects for details
 		};
 
 		std::mutex                                     g_lock;

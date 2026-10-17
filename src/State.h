@@ -11,4 +11,7 @@ namespace companion::state
 	// Latest snapshots as JSON text. Safe to call from any thread.
 	std::string GetStateJson();
 	std::string GetMarkersJson();
+
+	// The map screen was opened; markers load from then on (game thread).
+	void OnMapOpened();
 }

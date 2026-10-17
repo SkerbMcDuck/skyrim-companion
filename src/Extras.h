@@ -9,4 +9,9 @@ namespace companion::extras
 	json Quests(RE::PlayerCharacter* a_player);        // objectives of active (tracked) quests
 	json Crosshair(RE::PlayerCharacter* a_player);     // details for whatever is under the crosshair
 	float ShoutCooldown(RE::PlayerCharacter* a_player);
+	json  OreVein(RE::TESObjectREFR* a_ref);
+	json  Books(RE::PlayerCharacter* a_player);        // books, notes and maps you carry
+	std::string BookText(RE::FormID a_id);             // game thread: the book's own text
+	json  Character(RE::PlayerCharacter* a_player);    // race start values and level-up spread
+	json  Stress();                                    // Stress and Fear  // Random Mining values, or null if not an ore vein
 }

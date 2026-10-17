@@ -83,8 +83,10 @@ namespace companion::extras
 			return owner ? Name(owner) : std::string();
 		}
 
-		// Reads Random Mining's MineOreScript values off an ore vein. Read-only.
-		json OreVein(RE::TESObjectREFR* a_ref)
+	}
+
+	// Reads Random Mining's MineOreScript values off an ore vein. Read-only.
+	json OreVein(RE::TESObjectREFR* a_ref)
 		{
 			const auto vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
 			if (!vm) {
@@ -110,7 +112,6 @@ namespace companion::extras
 				{ "swingsLeft", readInt("StrikesCurrent") },       // -1 = not started yet
 				{ "swingsEach", readInt("StrikesBeforeCollection") }
 			};
-		}
 	}
 
 	json Progress(RE::PlayerCharacter* a_player)
@@ -391,4 +392,72 @@ namespace companion::extras
 		}
 		return j;
 	}
+
+	json Books(RE::PlayerCharacter* a_player)
+	{
+		json list = json::array();
+		const auto inv = a_player->GetInventory([](RE::TESBoundObject& a_obj) { return a_obj.Is(RE::FormType::Book); });
+		for (const auto& [obj, data] : inv) {
+			const auto book = obj ? obj->As<RE::TESObjectBOOK>() : nullptr;
+			if (!book || data.first <= 0) {
+				continue;
+			}
+			json j{ { "id", book->GetFormID() }, { "name", data.second ? Str(data.second->GetDisplayName()) : Name(book) }, { "read", book->IsRead() },
+				{ "note", book->IsNoteScroll() }, { "quest", data.second && data.second->IsQuestObject() }, { "count", data.first } };
+			if (book->TeachesSkill()) {
+				const int i = static_cast<int>(book->GetSkill()) - static_cast<int>(RE::ActorValue::kOneHanded);
+				if (i >= 0 && i < 18) {
+					j["skill"] = kSkillNames[i];
+				}
+			}
+			list.push_back(std::move(j));
+		}
+		return list;
+	}
+
+	std::string BookText(RE::FormID a_id)
+	{
+		const auto book = RE::TESForm::LookupByID<RE::TESObjectBOOK>(a_id);
+		if (!book) {
+			return R"({"error":"not found"})";
+		}
+		RE::BSString text;
+		book->GetDescription(text, book);
+		return json{ { "id", a_id }, { "name", Name(book) }, { "text", Str(text.c_str()) } }.dump(-1, ' ', false, json::error_handler_t::replace);
+	}
+
+	json Character(RE::PlayerCharacter* a_player)
+	{
+		// Level-up spread: (base value - race starting value) / points per level-up.
+		const auto race = a_player->GetRace();
+		float perLevel = 10.0f;
+		if (const auto gmst = RE::GameSettingCollection::GetSingleton(); gmst) {
+			if (const auto s = gmst->GetSetting("iAVDhmsLevelUp"); s) {
+				perLevel = static_cast<float>(s->GetInteger());
+			}
+		}
+		const auto owner = a_player->AsActorValueOwner();
+		auto spread = [&](RE::ActorValue a_av, float a_start) {
+			const float base = owner->GetBaseActorValue(a_av);
+			return json{ { "base", base }, { "start", a_start }, { "levels", perLevel > 0 ? std::round((base - a_start) / perLevel) : 0.0f } };
+		};
+		if (!race) {
+			return nullptr;
+		}
+		return json{ { "race", Name(race) }, { "perLevel", perLevel },
+			{ "health", spread(RE::ActorValue::kHealth, race->data.startingHealth) },
+			{ "magicka", spread(RE::ActorValue::kMagicka, race->data.startingMagicka) },
+			{ "stamina", spread(RE::ActorValue::kStamina, race->data.startingStamina) } };
+	}
+
+	json Stress()
+	{
+		const auto total = RE::TESForm::LookupByEditorID<RE::TESGlobal>("Stress_Total");
+		const auto enabled = RE::TESForm::LookupByEditorID<RE::TESGlobal>("Stress_Enabled");
+		if (!total) {
+			return nullptr;
+		}
+		return json{ { "value", total->value }, { "max", 100 }, { "enabled", enabled ? enabled->value != 0.0f : true } };
+	}
 }
+

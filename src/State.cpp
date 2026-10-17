@@ -2,6 +2,9 @@
 #include "Readouts.h"
 #include "Extras.h"
 #include "Feed.h"
+#include "Radar.h"
+#include "LocalMap.h"
+#include "Log.h"
 
 namespace companion::state
 {
@@ -13,6 +16,8 @@ namespace companion::state
 		std::atomic<bool> g_gameReady{ false };
 		std::atomic<bool> g_taskPending{ false };
 		std::atomic<bool> g_rescanMarkers{ true };
+		std::atomic<bool> g_mapOpened{ false };  // markers load the first time the map screen opens
+		int               g_ticksSinceLocalMap = 0;
 
 		std::mutex  g_lock;
 		std::string g_stateJson = R"({"ready":false})";
@@ -183,13 +188,23 @@ namespace companion::state
 					state["warmth"] = safely("Warmth", [&] { return extras::Warmth(player); });
 					state["crosshair"] = safely("Crosshair", [&] { return extras::Crosshair(player); });
 					state["shoutCooldown"] = safely("Shout cooldown", [&] { return json(extras::ShoutCooldown(player)); });
+					state["radar"] = safely("Radar", [&] { return radar::Build(player); });
+					state["stress"] = safely("Stress", [] { return extras::Stress(); });
+					state["mapOpened"] = g_mapOpened.load();
+					if (++g_ticksSinceLocalMap >= 3) {
+						g_ticksSinceLocalMap = 0;
+						safely("Local map", [&] { localmap::Tick(player); return json(nullptr); });
+					}
 					if (++g_ticksSinceInventory >= 10) {
 						g_ticksSinceInventory = 0;
 						g_slowParts = {
 							{ "equipment", safely("Equipment", [&] { return readouts::Equipment(player); }) },
 							{ "consumables", safely("Consumables", [&] { return readouts::Consumables(player); }) },
 							{ "supplies", safely("Supplies", [&] { return extras::Supplies(player); }) },
-							{ "quests", safely("Quests", [&] { return extras::Quests(player); }) }
+							{ "quests", safely("Quests", [&] { return extras::Quests(player); }) },
+							{ "books", safely("Books", [&] { return extras::Books(player); }) },
+							{ "character", safely("Character", [&] { return extras::Character(player); }) },
+							{ "partySlots", safely("Party slots", [] { return readouts::PartySlots(); }) }
 						};
 					}
 					state.update(g_slowParts);
@@ -198,7 +213,7 @@ namespace companion::state
 					const auto worldspace = player->GetWorldspace();
 					const RE::FormID wsId = worldspace ? worldspace->GetFormID() : 0;
 					std::string markersText;
-					if (wsId != g_lastWorldspace || ++g_ticksSinceMarkers >= kMarkerRefreshTicks) {
+					if (g_mapOpened && (wsId != g_lastWorldspace || g_rescanMarkers || ++g_ticksSinceMarkers >= kMarkerRefreshTicks)) {
 						// Indoors there is no worldspace; keep showing the last outdoor markers.
 						if (worldspace) {
 							markersText = BuildMarkers(worldspace).dump(-1, ' ', false, json::error_handler_t::replace);
@@ -226,6 +241,11 @@ namespace companion::state
 			// SKSE load/new-game messages arrive on the main thread.
 			readouts::ResetFollowers();
 			feed::Clear();
+			radar::Reset();
+			localmap::Reset();
+			if (const auto player = RE::PlayerCharacter::GetSingleton(); player) {
+				textlog::Write(std::format("{} | Loaded a save: {}", textlog::GameDate(), player->GetName() ? player->GetName() : ""));
+			}
 		}
 		g_gameReady = a_ready;
 		g_rescanMarkers = true;  // a different save can have different markers
@@ -264,5 +284,12 @@ namespace companion::state
 	{
 		std::scoped_lock l{ g_lock };
 		return g_markersJson;
+	}
+
+	void OnMapOpened()
+	{
+		if (!g_mapOpened.exchange(true)) {
+			g_rescanMarkers = true;
+		}
 	}
 }
